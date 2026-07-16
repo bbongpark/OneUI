@@ -293,10 +293,10 @@ App.register("meetings", {
         const dw = DOW[new Date(ds + "T00:00:00").getDay()];
         return `<div class="bcol ${used > s.capacity_min ? "over-cap" : ""}" data-drop="${ds}">
           <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span>
+            ${s.items.length ? `<button class="btn small" data-mail="${ds}" title="이 회의일 공지 메일 초안" style="margin-left:auto">✉ 공지 메일 초안</button>` : ""}
             <button class="btn ghost small x" data-hide="${ds}" title="안건 배정에서 숨기기 (회의일은 유지됩니다)" style="padding:0 4px">✕</button></div>
           <div class="cap"><span>${s.items.length}건</span><span style="${used > s.capacity_min ? "color:var(--crit);font-weight:700" : ""}">${used}/${s.capacity_min}분</span></div>
           <div class="meter ${used > s.capacity_min ? "over" : pct > 85 ? "warn" : ""}"><i style="width:${pct}%"></i></div>
-          ${s.items.length ? `<button class="btn small" data-mail="${ds}" style="width:100%;margin:2px 0 6px">✉ 공지 메일 초안</button>` : ""}
           ${s.items.map(i => card(i, i.feature_index)).join("") || '<div class="empty-drop">여기로 안건을 끌어오세요</div>'}
         </div>`;
       }).join("");
