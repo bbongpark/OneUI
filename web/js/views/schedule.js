@@ -67,15 +67,14 @@ App.register("schedule", {
             <div class="card-head">${dk} <span class="sub">${ddLabel} · ${g.length}건${owners.length ? ` · 담당자 ${owners.length}명` : " · 담당자 없음"}</span>
               <button class="btn small" data-mail="${dk}" style="margin-left:auto">✉ 공지 메일 초안</button></div>
             <div class="card-body" style="overflow-x:auto">
-              <table class="tbl"><thead><tr><th>인덱스</th><th>기능명</th><th>제목</th><th>변경점</th><th>개발일정</th><th>지연사유</th></tr></thead>
+              <table class="tbl"><thead><tr><th>인덱스</th><th>기능명</th><th>변경점</th><th>개발일정</th><th>지연사유</th></tr></thead>
               <tbody>${g.map(({ f }) => {
                 const chg = changeCol ? cell(f, changeCol) : "";
                 const reason = reasonOf(f);
                 return `<tr>
                   <td class="idx">${f.feature_index}</td>
                   <td>${esc(f.function_name)}</td>
-                  <td>${esc(f.name) || '<span style="color:var(--text-3)">미기재</span>'}</td>
-                  <td style="max-width:280px;font-size:11.5px;color:var(--text-2)" title="${esc(chg)}">${esc(chg.length > 70 ? chg.slice(0, 70) + "…" : chg)}</td>
+                  <td style="max-width:340px;font-size:11.5px;color:var(--text-2)" title="${esc(chg)}">${esc(chg.length > 80 ? chg.slice(0, 80) + "…" : chg)}</td>
                   <td>${esc(cell(f, devCol))}${f.dev_delay ? ` <span class="badge b-nogo" title="${esc(f.dev_delay.from)} → ${esc(f.dev_delay.to)}">⏰ 지연</span>` : ""}</td>
                   <td style="font-size:11.5px;${reason ? "color:var(--serious)" : "color:var(--text-3)"}">${esc(reason) || (f.dev_delay ? "미기재" : "—")}</td>
                 </tr>`;
@@ -89,12 +88,18 @@ App.register("schedule", {
     const openMail = (dk, list) => {
       const recipients = [...new Set(list.flatMap(f => mails(cell(f, ownerCol))))].join(";");
       const subject = `[One UI ${ver}] 개발 일정 안내 — ${dk} (${list.length}건)`;
-      const cols = ["인덱스", "기능명", "제목", "변경점", "개발일정", "지연사유"];
-      const rowOf = f => [f.feature_index, f.function_name || "", f.name || "",
+      const cols = ["인덱스", "기능명", "변경점", "개발일정", "지연사유"];
+      const rowOf = f => [f.feature_index, f.function_name || "",
         (changeCol ? cell(f, changeCol) : ""), cell(f, devCol), reasonOf(f)];
-      const tableHtml = `<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;font-size:13px">
-        <thead><tr style="background:#f0f2f6">${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>
-        <tbody>${list.map(f => `<tr>${rowOf(f).map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      // 메일에 붙여넣을 표 — 외부 CSS가 안 따라가므로 스타일을 전부 인라인으로.
+      const thBase = "padding:8px 11px;text-align:left;background:#33456b;color:#fff;font-weight:600;border:1px solid #33456b;white-space:nowrap";
+      const tdBase = "padding:7px 11px;border:1px solid #d7dde8;vertical-align:top";
+      const tableHtml = `<table style="border-collapse:collapse;width:100%;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;color:#1a2233">
+        <thead><tr>${cols.map(c => `<th style="${thBase}">${c}</th>`).join("")}</tr></thead>
+        <tbody>${list.map((f, ri) => `<tr style="background:${ri % 2 ? "#f6f8fb" : "#ffffff"}">${rowOf(f).map((v, ci) => {
+          const extra = ci === 0 ? ";white-space:nowrap;font-weight:600" : ci === 2 ? ";min-width:240px" : ci === 3 ? ";white-space:nowrap" : "";
+          return `<td style="${tdBase}${extra}">${esc(v) || '<span style="color:#9aa5b8">—</span>'}</td>`;
+        }).join("")}</tr>`).join("")}</tbody></table>`;
       const tsv = [cols.join("\t"), ...list.map(f => rowOf(f).map(v => String(v).replace(/\s+/g, " ")).join("\t"))].join("\n");
       const topDefault = `안녕하세요.\n아래 기능들의 개발 일정이 ${dk}로 예정되어 있습니다. 일정 확인 및 준수 부탁드립니다.`;
       const botDefault = `일정 지연이 필요한 경우 지연사유를 회신 부탁드립니다.\n감사합니다.`;
