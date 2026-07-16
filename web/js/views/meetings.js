@@ -281,23 +281,53 @@ App.register("meetings", {
         };
         it.ondragend = () => it.classList.remove("dragging");
       });
+      // 커서 위치 → 끼워 넣을 자리 (끌고 있는 항목은 계산에서 제외)
+      const insertPos = (col, y) => {
+        const items = [...col.querySelectorAll(".bitem:not(.dragging)")];
+        for (let i = 0; i < items.length; i++) {
+          const r = items[i].getBoundingClientRect();
+          if (y < r.top + r.height / 2) return { index: i, before: items[i] };
+        }
+        return { index: items.length, before: null };
+      };
+      const clearLine = () => el.querySelectorAll(".drop-line").forEach(l => l.remove());
+
       el.querySelectorAll("[data-drop]").forEach(col => {
-        col.ondragover = e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; col.classList.add("drop"); };
-        col.ondragleave = () => col.classList.remove("drop");
+        col.ondragover = e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          col.classList.add("drop");
+          clearLine();
+          const { before } = insertPos(col, e.clientY);      // 표시선을 그 자리에 그린다
+          const line = document.createElement("div");
+          line.className = "drop-line";
+          if (before) before.before(line);
+          else (col.querySelector(".empty-drop") || col).append(line);
+        };
+        col.ondragleave = e => {
+          if (col.contains(e.relatedTarget)) return;         // 자식으로 이동한 것뿐이면 유지
+          col.classList.remove("drop"); clearLine();
+        };
         col.ondrop = async e => {
           e.preventDefault();
-          col.classList.remove("drop");
-          const idx = e.dataTransfer.getData("text/plain");
-          if (!idx) return;
+          const { index } = insertPos(col, e.clientY);
+          col.classList.remove("drop"); clearLine();
+          const fi = e.dataTransfer.getData("text/plain");
+          if (!fi) return;
           const to = col.dataset.drop;                       // "" = 미배정 컬럼
-          const from = slots.find(s => s.items.some(i => i.feature_index === idx));
-          if ((from && from.date === to) || (!from && !to)) return;   // 제자리
+          const from = slots.find(s => s.items.some(i => i.feature_index === fi));
+          const sameCol = (from && from.date === to) || (!from && !to);
+          // 같은 컬럼의 제자리 드롭이면 서버를 부르지 않는다.
+          // (index는 자기 자신을 뺀 자리 번호 → 원래 자리와 같으면 결과가 동일)
+          if (sameCol) {
+            const list = to ? byDate[to].items.map(i => i.feature_index) : (sched.unassigned || []);
+            if (index === list.indexOf(fi)) return;
+          }
           try {
-            const r = to
-              ? await app.api("/api/schedule/move", { version: app.state.version, feature_index: idx,
-                  date: to, time: byDate[to].time })
-              : await app.api("/api/schedule/move", { version: app.state.version, feature_index: idx, cancel: true });
-            app.toast(to ? `${idx} → ${to} 이동` : `${idx} → 미배정`);
+            const r = await app.api("/api/schedule/move", to
+              ? { version: app.state.version, feature_index: fi, date: to, time: byDate[to].time, index }
+              : { version: app.state.version, feature_index: fi, cancel: true, index });
+            app.toast(sameCol ? `${fi} 순서 변경` : to ? `${fi} → ${to} 이동` : `${fi} → 미배정`);
             if (r.warning) app.toast("⚠ " + r.warning, true);
             await app.reload(); app.route();
           } catch (e2) { app.toast(e2.message, true); }

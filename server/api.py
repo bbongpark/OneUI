@@ -243,15 +243,17 @@ def api_schedule_move(b):
                         "est_min": int(b.get("est_min") or 5), "followup": False, "predicted": None}
         if item is None:
             raise RuntimeError("해당 안건을 찾을 수 없음")
+        pos = b.get("index")                   # 드롭한 위치 (None이면 맨 뒤)
         if b.get("cancel"):
-            obj.setdefault("unassigned", []).append(item["feature_index"])
+            un = obj.setdefault("unassigned", [])
+            un.insert(pos, item["feature_index"]) if isinstance(pos, int) else un.append(item["feature_index"])
             return obj
         tgt = next((s for s in obj["slots"] if s["date"] == b["date"] and s["time"] == b["time"]), None)
         if tgt is None:
             tgt = {"date": b["date"], "time": b["time"], "items": [], "capacity_min": 60}
             obj["slots"].append(tgt)
             obj["slots"].sort(key=lambda s: (s["date"], s["time"]))
-        tgt["items"].append(item)
+        tgt["items"].insert(pos, item) if isinstance(pos, int) else tgt["items"].append(item)
         used = sum(i["est_min"] for i in tgt["items"])
         obj["warning"] = ("슬롯 %s %s 용량 초과 (%d분/60분)" % (b["date"], b["time"], used)) if used > tgt["capacity_min"] else ""
         return obj
