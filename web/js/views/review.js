@@ -26,12 +26,17 @@ App.register("review", {
           ${Object.entries(App.GRADES).map(([k, v]) => `<option value="${k}">${v.label} · ${v.full}</option>`).join("")}</select>
         <select id="f-dept"><option value="">기능명 전체</option>${[...new Set(feats.map(f => f.function_name))].sort().map(x => `<option>${x}</option>`).join("")}</select>
         <select id="f-cat"><option value="">AI카테고리 전체</option>${[...new Set(feats.map(f => f.ai_category))].filter(Boolean).sort().map(x => `<option>${x}</option>`).join("")}</select>
-        <select id="f-state">
-          <option value="">상태 전체</option><option value="needs_human">사람 확인 필요</option>
+        <select id="f-stage" title="파이프라인 진행 단계 — 한 건은 항상 하나에만 속한다">
+          <option value="">단계 전체</option><option value="ingested">인입</option>
+          <option value="reviewing">리뷰 중</option><option value="meeting_wait">회의 대기</option>
+          <option value="decided">결정됨</option>
+        </select>
+        <select id="f-cond" title="골라보기 조건 — 단계와 무관하게 겹칠 수 있다">
+          <option value="">조건 전체</option><option value="needs_human">사람 확인 필요</option>
           <option value="notready">PL 미준비</option><option value="risk">일정 리스크 있음</option>
           <option value="divergent">부문 인식 충돌</option><option value="rereg">재등록</option>
-          <option value="decided">결정됨</option><option value="devdone">개발 완료</option>
-          <option value="rejected">미지원 목록</option>
+          <option value="devdone">개발 완료</option>
+          <option value="rejected">미지원 목록 (평소 숨김)</option>
         </select>
         <span class="count" id="f-count"></span>
       </div>
@@ -41,7 +46,9 @@ App.register("review", {
         </tr></thead><tbody id="rows"></tbody>
       </table></div></div>`;
 
-    if (preset && preset !== "all") el.querySelector("#f-state").value = preset === "notready" ? "notready" : preset;
+    // 현황판 드릴다운(?f=) — 결정됨만 단계, 나머지는 조건
+    if (preset && preset !== "all")
+      el.querySelector(preset === "decided" ? "#f-stage" : "#f-cond").value = preset;
     const gPreset = (location.hash.split("?g=")[1] || "");     // 현황판 등급 범례에서 넘어온 경우
     if (gPreset && App.GRADES[gPreset]) el.querySelector("#f-grade").value = gPreset;
 
@@ -49,22 +56,24 @@ App.register("review", {
     const draw = () => {
       const q = el.querySelector("#f-q").value.toLowerCase();
       const fg = el.querySelector("#f-grade").value, fd = el.querySelector("#f-dept").value;
-      const fc = el.querySelector("#f-cat").value, fs = el.querySelector("#f-state").value;
+      const fc = el.querySelector("#f-cat").value;
+      const fst = el.querySelector("#f-stage").value, fcd = el.querySelector("#f-cond").value;
       const list = feats.filter(f => {
         const it = rv[f.feature_index] || {}, syn = it.synthesis || {}, plc = pl[f.feature_index] || {};
-        if (fs !== "rejected" && f.decision === "reject") return false;
-        if (fs === "rejected") return f.decision === "reject";
+        // 미지원은 통계 모수 밖 — 평소 목록에서 빠지고 '미지원 목록' 조건에서만 보인다
+        if (fcd === "rejected") { if (f.decision !== "reject") return false; }
+        else if (f.decision === "reject") return false;
         if (q && !((f.name || "").toLowerCase().includes(q) || f.feature_index.toLowerCase().includes(q) || (f.function_name || "").includes(q))) return false;
         if (fg && syn.final_grade !== fg) return false;
         if (fd && f.function_name !== fd) return false;
         if (fc && f.ai_category !== fc) return false;
-        if (fs === "needs_human" && syn.status !== "needs_human") return false;
-        if (fs === "notready" && (plc.ready !== false)) return false;
-        if (fs === "risk" && app.scheduleRisk(f).risk !== true) return false;
-        if (fs === "divergent" && !syn.divergent) return false;
-        if (fs === "rereg" && !f.reregistered_from) return false;
-        if (fs === "decided" && f.status !== "decided") return false;
-        if (fs === "devdone" && !app.isDevDone(f)) return false;
+        if (fst && f.status !== fst) return false;                 // 단계 = f.status 하나
+        if (fcd === "needs_human" && syn.status !== "needs_human") return false;
+        if (fcd === "notready" && plc.ready !== false) return false;
+        if (fcd === "risk" && app.scheduleRisk(f).risk !== true) return false;
+        if (fcd === "divergent" && !syn.divergent) return false;
+        if (fcd === "rereg" && !f.reregistered_from) return false;
+        if (fcd === "devdone" && !app.isDevDone(f)) return false;
         return true;
       });
       el.querySelector("#f-count").textContent = list.length + "건";
@@ -189,7 +198,7 @@ App.register("review", {
     };
 
     el.querySelectorAll("[data-run]").forEach(b => b.onclick = () => app.run(b.dataset.run));
-    ["#f-q", "#f-grade", "#f-dept", "#f-cat", "#f-state"].forEach(s => el.querySelector(s).oninput = draw);
+    ["#f-q", "#f-grade", "#f-dept", "#f-cat", "#f-stage", "#f-cond"].forEach(s => el.querySelector(s).oninput = draw);
     draw();
 
     // ── PPT 매핑 확인 (사람 확정 절차) ──
