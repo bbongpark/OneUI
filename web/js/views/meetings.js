@@ -6,7 +6,16 @@ App.register("meetings", {
     const fmap = Object.fromEntries(feats.map(f => [f.feature_index, f]));
     const readonly = d.features.readonly;
     const admin = app.state.user.role === "admin";
-    const stats = d.pred_stats.runs || [];
+    const stats = d.pred_stats.runs || [];   // 최신순 — stats[0]이 가장 최근 회의
+    // 최근 5개 회의를 안건 수로 가중해 종합(단순 평균 아님 — detail.match를 직접 합산)
+    const recentRuns = stats.slice(0, 5);
+    const agg = recentRuns.reduce((a, r) => {
+      const n = Array.isArray(r.detail) ? r.detail.length : (r.n || 0);
+      const hit = Array.isArray(r.detail) ? r.detail.filter(x => x.match).length
+                                          : Math.round((r.accuracy || 0) / 100 * (r.n || 0));
+      return { n: a.n + n, hit: a.hit + hit };
+    }, { n: 0, hit: 0 });
+    const aggAcc = agg.n ? Math.round(agg.hit / agg.n * 100) : 0;
     const BOARD_MAX = 5;          // 안건 배정 보드에 한 번에 표시할 회의일 수
 
     el.innerHTML = `
@@ -51,9 +60,9 @@ App.register("meetings", {
           <div class="card-body">
             ${stats.length ? `<div style="display:flex;gap:18px;align-items:flex-start">
                 <div style="flex:0 0 auto">
-                  <div style="font-size:11px;color:var(--text-3)">최근 회의 (${stats[0].meeting_id})</div>
-                  <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:var(--accent)">${stats[0].accuracy}%</div>
-                  <div style="font-size:11.5px;color:var(--text-2)">안건 ${stats[0].n}건 중 ${Math.round(stats[0].accuracy / 100 * stats[0].n)}건 적중</div>
+                  <div style="font-size:11px;color:var(--text-3)">최근 ${recentRuns.length}개 회의 종합</div>
+                  <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:var(--accent)">${aggAcc}%</div>
+                  <div style="font-size:11.5px;color:var(--text-2)">안건 ${agg.n}건 중 ${agg.hit}건 적중</div>
                 </div>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:10.5px;color:var(--text-3);margin-bottom:2px">회의별 적중률 추이 (막대 1개 = 회의 1회)</div>
