@@ -246,6 +246,30 @@ App.register("meetings", {
       });
     };
 
+    // 회의일별 공지 메일 초안 — 담당자 메일을 ;로 연결, 표는 맨 끝(일정 관리와 같은 방식, 표 위치만 다름)
+    const openMeetingMail = ds => {
+      const s = byDate[ds];
+      if (!s) return;
+      const flds = app.state.boot.schema_fields || {};
+      const cell = (f, key) => (f.row || {})[flds[key]] || "";
+      const list = s.items.map(i => fmap[i.feature_index]).filter(Boolean);
+      const ownerKeys = ["group_lead", "dev_owner", "ep_owner", "ux_owner", "cxi_owner"];
+      const recipients = [...new Set(list.flatMap(f => ownerKeys.flatMap(k => App.extractMails(cell(f, k)))))].join(";");
+      const dw = DOW[new Date(ds + "T00:00:00").getDay()];
+      app.mailDraftModal({
+        title: `회의 공지 메일 초안 — ${ds}`,
+        recipients,
+        subject: `[One UI ${app.state.version}] 리뷰 회의 안내 — ${ds}(${dw}) ${s.time} (${list.length}건)`,
+        cols: ["인덱스", "기능명", "변경점", "개발그룹", "그룹장", "개발담당자", "EP담당자", "UX담당자", "CXI담당자"],
+        rows: list.map(f => [f.feature_index, f.function_name || "", cell(f, "change_summary"),
+          cell(f, "dev_group"), cell(f, "group_lead"), cell(f, "dev_owner"),
+          cell(f, "ep_owner"), cell(f, "ux_owner"), cell(f, "cxi_owner")]),
+        tableAtEnd: true,
+        topDefault: `안녕하세요.\n${ds}(${dw}) ${s.time}에 One UI ${app.state.version} 리뷰 회의를 진행합니다. 아래 안건을 확인해 주세요.`,
+        botDefault: `발표 자료와 예상 질문 준비 부탁드립니다.\n감사합니다.`,
+      });
+    };
+
     // ── 보드: 표시 중인 회의일(최대 BOARD_MAX)을 나란히 놓고 안건을 드래그로 옮긴다 ──
     // 회의일 추가·삭제는 위 "회의일 지정"에서만 — 여기 ✕는 보드에서 숨기기일 뿐이다.
     const drawBoard = () => {
@@ -266,6 +290,7 @@ App.register("meetings", {
         const dw = DOW[new Date(ds + "T00:00:00").getDay()];
         return `<div class="bcol ${used > s.capacity_min ? "over-cap" : ""}" data-drop="${ds}">
           <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span>
+            ${s.items.length ? `<button class="btn ghost small" data-mail="${ds}" title="이 회의일 공지 메일 초안" style="padding:0 4px">✉</button>` : ""}
             <button class="btn ghost small x" data-hide="${ds}" title="안건 배정에서 숨기기 (회의일은 유지됩니다)" style="padding:0 4px">✕</button></div>
           <div class="cap"><span>${s.items.length}건</span><span style="${used > s.capacity_min ? "color:var(--crit);font-weight:700" : ""}">${used}/${s.capacity_min}분</span></div>
           <div class="meter ${used > s.capacity_min ? "over" : pct > 85 ? "warn" : ""}"><i style="width:${pct}%"></i></div>
@@ -286,6 +311,7 @@ App.register("meetings", {
 
     const bindBoard = () => {
       el.querySelectorAll("[data-hide]").forEach(b => b.onclick = e => { e.stopPropagation(); toggleShown(b.dataset.hide); });
+      el.querySelectorAll("[data-mail]").forEach(b => b.onclick = e => { e.stopPropagation(); openMeetingMail(b.dataset.mail); });
       el.querySelectorAll(".bitem").forEach(it => {
         it.onclick = () => openItem(it.dataset.idx);
         it.ondragstart = e => {

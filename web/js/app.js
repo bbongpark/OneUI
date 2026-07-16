@@ -378,5 +378,67 @@ const App = {
     sel.removeAllRanges(); document.body.removeChild(div);
     if (!ok) return this.copyText(plain);   // 그래도 안 되면 최소한 plain
     return ok;
+  },
+
+  // ── 공지 메일 초안 (일정 관리·회의 공용) ──
+  // 셀 값에서 .com으로 끝나는 메일 토큰만 추출 (공백·쉼표·세미콜론 어떤 구분이든)
+  extractMails(s) { return String(s == null ? "" : s).match(/[^\s,;]+\.com\b/gi) || []; },
+
+  // 메일에 붙여넣을 표 — 외부 CSS가 안 따라가므로 인라인. 색 강조 없이 검은색·무채색.
+  mailTableHtml(cols, rows) {
+    const e = s => String(s == null ? "" : s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const th = "padding:8px 11px;text-align:left;background:#eeeeee;color:#000000;font-weight:700;border:1px solid #999999;white-space:nowrap";
+    const td = "padding:7px 11px;border:1px solid #cccccc;vertical-align:top;color:#000000";
+    return `<table style="border-collapse:collapse;width:100%;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;color:#000000">
+      <thead><tr>${cols.map(c => `<th style="${th}">${e(c)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((r, ri) => `<tr style="background:${ri % 2 ? "#f7f7f7" : "#ffffff"}">${r.map(v => `<td style="${td}">${e(v) || '<span style="color:#999999">—</span>'}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  },
+
+  // 공지 메일 초안 모달. tableAtEnd=false면 인사말·표·맺음말, true면 인사말·맺음말·표(맨 끝).
+  mailDraftModal(o) {
+    const e = s => String(s == null ? "" : s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const tableHtml = this.mailTableHtml(o.cols, o.rows);
+    const tableBox = `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;background:#fff;overflow-x:auto">${tableHtml}</div>`;
+    const tsv = [o.cols.join("\t"), ...o.rows.map(r => r.map(v => String(v == null ? "" : v).replace(/\s+/g, " ")).join("\t"))].join("\n");
+    const topLbl = `<div class="section-label" style="margin-top:14px">인사말 <span style="font-weight:400;text-transform:none">— 편집 가능</span></div>`;
+    const botLbl = `<div class="section-label" style="margin-top:12px">맺음말 <span style="font-weight:400;text-transform:none">— 편집 가능</span></div>`;
+    const tblLbl = `<div class="section-label" style="margin-top:12px">아이템 표 <span style="font-weight:400;text-transform:none">— 자동 (수정 불가)</span></div>`;
+    const ta = (id, v) => `<textarea id="${id}" rows="2" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:8px;resize:vertical">${e(v)}</textarea>`;
+    const middle = o.tableAtEnd
+      ? `${topLbl}${ta("mail-top", o.topDefault)}${botLbl}${ta("mail-bot", o.botDefault)}${tblLbl}${tableBox}`
+      : `${topLbl}${ta("mail-top", o.topDefault)}${tblLbl}${tableBox}${botLbl}${ta("mail-bot", o.botDefault)}`;
+
+    const wrap = this.el(`
+      <div>
+        <div class="section-label">수신자 <span style="font-weight:400;text-transform:none">— 담당자 메일을 ;로 연결 (${o.recipients ? o.recipients.split(";").length : 0}명)</span></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="rcpt" readonly value="${e(o.recipients)}" style="flex:1;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)">
+          <button class="btn small" id="cp-rcpt">복사</button>
+        </div>
+        ${o.recipients ? "" : '<div style="font-size:11.5px;color:var(--warn);margin-top:4px">담당자 메일이 없습니다 — 엑셀 담당자 열을 확인하세요.</div>'}
+        <div class="section-label" style="margin-top:14px">제목</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="subj" readonly value="${e(o.subject)}" style="flex:1;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)">
+          <button class="btn small" id="cp-subj">복사</button>
+        </div>
+        ${middle}
+      </div>`);
+
+    const flash = (btn, ok) => { const t = btn.textContent; btn.textContent = ok ? "복사됨" : "복사 실패"; setTimeout(() => btn.textContent = t, 1300); };
+    const topVal = () => wrap.querySelector("#mail-top").value;
+    const botVal = () => wrap.querySelector("#mail-bot").value;
+    const para = s => `<p>${e(s).replace(/\n/g, "<br>")}</p>`;
+    const buildHtml = () => o.tableAtEnd ? `${para(topVal())}${para(botVal())}${tableHtml}` : `${para(topVal())}${tableHtml}${para(botVal())}`;
+    const buildPlain = () => o.tableAtEnd ? `${topVal()}\n\n${botVal()}\n\n${tsv}` : `${topVal()}\n\n${tsv}\n\n${botVal()}`;
+
+    wrap.querySelector("#cp-rcpt").onclick = async ev => flash(ev.target, await this.copyText(o.recipients));
+    wrap.querySelector("#cp-subj").onclick = async ev => flash(ev.target, await this.copyText(o.subject));
+    const cpBody = document.createElement("button");
+    cpBody.className = "btn"; cpBody.textContent = "본문 복사 (표 포함)";
+    cpBody.onclick = async () => flash(cpBody, await this.copyRich(buildHtml(), buildPlain()));
+    const cpAll = document.createElement("button");
+    cpAll.className = "btn primary"; cpAll.textContent = "수신자+제목+본문 복사";
+    cpAll.onclick = async () => flash(cpAll, await this.copyText(`받는사람: ${o.recipients}\n제목: ${o.subject}\n\n${buildPlain()}`));
+    this.modal({ title: o.title, body: wrap, foot: [cpBody, cpAll], wide: true });
   }
 };

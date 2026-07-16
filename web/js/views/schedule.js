@@ -89,61 +89,18 @@ App.register("schedule", {
     };
 
     const openMail = (dk, list) => {
-      const recipients = [...new Set(list.flatMap(f => mails(cell(f, ownerCol))))].join(";");
-      const subject = `[One UI ${ver}] 개발 일정 안내 — ${dk} (${list.length}건)`;
-      const cols = ["인덱스", "기능명", "변경점", "개발일정", "지연사유"];
-      const rowOf = f => [f.feature_index, f.function_name || "",
-        (changeCol ? cell(f, changeCol) : ""), cell(f, devCol), reasonOf(f)];
-      // 메일에 붙여넣을 표 — 외부 CSS가 안 따라가므로 스타일 인라인. 색 강조 없이 검은색·무채색으로.
-      const thBase = "padding:8px 11px;text-align:left;background:#eeeeee;color:#000000;font-weight:700;border:1px solid #999999;white-space:nowrap";
-      const tdBase = "padding:7px 11px;border:1px solid #cccccc;vertical-align:top;color:#000000";
-      const tableHtml = `<table style="border-collapse:collapse;width:100%;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;color:#000000">
-        <thead><tr>${cols.map(c => `<th style="${thBase}">${c}</th>`).join("")}</tr></thead>
-        <tbody>${list.map((f, ri) => `<tr style="background:${ri % 2 ? "#f7f7f7" : "#ffffff"}">${rowOf(f).map((v, ci) => {
-          const extra = ci === 0 ? ";white-space:nowrap;font-weight:600" : ci === 2 ? ";min-width:240px" : ci === 3 ? ";white-space:nowrap" : "";
-          return `<td style="${tdBase}${extra}">${esc(v) || '<span style="color:#999999">—</span>'}</td>`;
-        }).join("")}</tr>`).join("")}</tbody></table>`;
-      const tsv = [cols.join("\t"), ...list.map(f => rowOf(f).map(v => String(v).replace(/\s+/g, " ")).join("\t"))].join("\n");
-      const topDefault = `안녕하세요.\n아래 기능들의 개발 일정이 ${dk}로 예정되어 있습니다. 일정 확인 및 준수 부탁드립니다.`;
-      const botDefault = `일정 지연이 필요한 경우 지연사유를 회신 부탁드립니다.\n감사합니다.`;
-
-      const wrap = App.el(`
-        <div>
-          <div class="section-label">수신자 <span style="font-weight:400;text-transform:none">— 담당자 메일을 ;로 연결 (${recipients ? recipients.split(";").length : 0}명)</span></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="rcpt" readonly value="${esc(recipients)}" style="flex:1;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)">
-            <button class="btn small" id="cp-rcpt">복사</button>
-          </div>
-          ${recipients ? "" : '<div style="font-size:11.5px;color:var(--serious);margin-top:4px">이 날짜 항목에 담당자 메일이 없습니다 — 엑셀 개발담당자 열을 확인하세요.</div>'}
-          <div class="section-label" style="margin-top:14px">제목</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="subj" readonly value="${esc(subject)}" style="flex:1;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)">
-            <button class="btn small" id="cp-subj">복사</button>
-          </div>
-          <div class="section-label" style="margin-top:14px">인사말 <span style="font-weight:400;text-transform:none">— 편집 가능</span></div>
-          <textarea id="mail-top" rows="2" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:8px;resize:vertical">${esc(topDefault)}</textarea>
-          <div class="section-label" style="margin-top:12px">아이템 표 <span style="font-weight:400;text-transform:none">— 자동 (수정 불가)</span></div>
-          <div style="border:1px solid var(--border);border-radius:8px;padding:10px;background:#fff;overflow-x:auto">${tableHtml}</div>
-          <div class="section-label" style="margin-top:12px">맺음말 <span style="font-weight:400;text-transform:none">— 편집 가능</span></div>
-          <textarea id="mail-bot" rows="2" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:8px;resize:vertical">${esc(botDefault)}</textarea>
-        </div>`);
-
-      const flash = (btn, ok) => { const o = btn.textContent; btn.textContent = ok ? "복사됨" : "복사 실패"; setTimeout(() => btn.textContent = o, 1300); };
-      const topVal = () => wrap.querySelector("#mail-top").value;
-      const botVal = () => wrap.querySelector("#mail-bot").value;
-      const buildHtml = () => `<p>${esc(topVal()).replace(/\n/g, "<br>")}</p>${tableHtml}<p>${esc(botVal()).replace(/\n/g, "<br>")}</p>`;
-      const buildPlain = () => `${topVal()}\n\n${tsv}\n\n${botVal()}`;
-
-      wrap.querySelector("#cp-rcpt").onclick = async e => flash(e.target, await app.copyText(recipients));
-      wrap.querySelector("#cp-subj").onclick = async e => flash(e.target, await app.copyText(subject));
-
-      const cpBody = document.createElement("button");
-      cpBody.className = "btn"; cpBody.textContent = "본문 복사 (표 포함)";
-      cpBody.onclick = async () => flash(cpBody, await app.copyRich(buildHtml(), buildPlain()));
-      const cpAll = document.createElement("button");
-      cpAll.className = "btn primary"; cpAll.textContent = "수신자+제목+본문 복사";
-      cpAll.onclick = async () => flash(cpAll, await app.copyText(`받는사람: ${recipients}\n제목: ${subject}\n\n${buildPlain()}`));
-      app.modal({ title: `공지 메일 초안 — ${dk}`, body: wrap, foot: [cpBody, cpAll], wide: true });
+      const recipients = [...new Set(list.flatMap(f => App.extractMails(cell(f, ownerCol))))].join(";");
+      app.mailDraftModal({
+        title: `공지 메일 초안 — ${dk}`,
+        recipients,
+        subject: `[One UI ${ver}] 개발 일정 안내 — ${dk} (${list.length}건)`,
+        cols: ["인덱스", "기능명", "변경점", "개발일정", "지연사유"],
+        rows: list.map(f => [f.feature_index, f.function_name || "",
+          (changeCol ? cell(f, changeCol) : ""), cell(f, devCol), reasonOf(f)]),
+        tableAtEnd: false,
+        topDefault: `안녕하세요.\n아래 기능들의 개발 일정이 ${dk}로 예정되어 있습니다. 일정 확인 및 준수 부탁드립니다.`,
+        botDefault: `일정 지연이 필요한 경우 지연사유를 회신 부탁드립니다.\n감사합니다.`,
+      });
     };
 
     el.querySelector("#win").oninput = draw;

@@ -38,6 +38,11 @@ DEV_OWNERS = ["jh.kim@partner-dev.com", "yr.lee@partner-dev.com", "sw.park@partn
               "mj.choi@partner-dev.com", "dh.jung@partner-dev.com", "hs.kang@partner-dev.com"]  # 개발담당자 메일
 DELAY_REASONS = ["선행 과제 의존성 지연", "인력 재배치로 착수 지연", "설계 변경으로 재작업",
                  "QA 이슈 대응 우선", "타 부서 API 제공 일정 지연"]  # 개발일정 지연사유
+DEV_GROUPS = ["플랫폼1그룹", "플랫폼2그룹", "UX플랫폼그룹", "카메라SW그룹", "커넥티비티그룹"]  # 개발그룹
+GROUP_LEADS = ["gl.shin@samsung.com", "gl.oh@samsung.com", "gl.yoon@samsung.com", "gl.bae@samsung.com"]  # 그룹장
+EP_OWNERS = ["ep.han@samsung.com", "ep.seo@samsung.com", "ep.moon@samsung.com"]   # EP담당자
+UX_OWNERS = ["ux.lim@samsung.com", "ux.jang@samsung.com", "ux.noh@samsung.com"]   # UX담당자
+CXI_OWNERS = ["cxi.woo@samsung.com", "cxi.hong@samsung.com", "cxi.ryu@samsung.com"]  # CXI담당자
 STATUS_POOL = ["기획완료", "설계중", "구현중", "구현완료", "검증중", "검증완료"]
 MODELS = ["전 모델", "플래그십", "폴더블", "플래그십+폴더블"]
 AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰)
@@ -94,6 +99,12 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         # 개발일정 지연 — 일부 항목은 일정을 뒤로 미뤘고 지연사유가 있다(비지연은 빈칸)
         delayed = bool(dev_d) and random.random() < 0.25
         row["지연사유"] = random.choice(DELAY_REASONS) if delayed else ""
+        # 회의 공지 메일용 — 개발그룹·그룹장·부문 담당자 (전 항목)
+        row["개발그룹"] = random.choice(DEV_GROUPS)
+        row["그룹장"] = random.choice(GROUP_LEADS)
+        row["EP담당자"] = random.choice(EP_OWNERS)
+        row["UX담당자"] = random.choice(UX_OWNERS)
+        row["CXI담당자"] = random.choice(CXI_OWNERS)
         # AI 상세 열 — AI 관련 Feature에만 값이 있다(비AI는 빈칸). config/excel_schema.json의 ai_detail로 상세에 표시.
         is_ai = cat != "AI 없음"
         row.update({
