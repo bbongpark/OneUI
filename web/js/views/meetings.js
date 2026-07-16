@@ -265,6 +265,7 @@ App.register("meetings", {
         rows: list.map(f => [f.feature_index, f.function_name || "", cell(f, "change_summary"),
           cell(f, "dev_group"), cell(f, "group_lead"), cell(f, "dev_owner"),
           cell(f, "ep_owner"), cell(f, "ux_owner"), cell(f, "cxi_owner")]),
+        colWidths: { "인덱스": 62, "기능명": 100, "개발그룹": 110, "그룹장": 72, "개발담당자": 78, "EP담당자": 78, "UX담당자": 78, "CXI담당자": 78 },
         tableAtEnd: true,
         draftKey: "meeting",
         topDefault: `안녕하세요.\n리뷰 회의 일정을 안내드립니다. 회의 일시와 안건은 제목·아래 표를 확인해 주세요.`,

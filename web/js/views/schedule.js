@@ -97,6 +97,7 @@ App.register("schedule", {
         cols: ["인덱스", "기능명", "변경점", "개발일정", "지연사유"],
         rows: list.map(f => [f.feature_index, f.function_name || "",
           (changeCol ? cell(f, changeCol) : ""), cell(f, devCol), reasonOf(f)]),
+        colWidths: { "인덱스": 62, "기능명": 110, "개발일정": 110, "지연사유": 150 },
         tableAtEnd: false,
         draftKey: "schedule",
         topDefault: `안녕하세요.\n아래 기능들의 개발 일정을 안내드립니다. 일정 확인 및 준수 부탁드립니다.`,

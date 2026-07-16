@@ -132,7 +132,7 @@
 
 **GET**: `/api/bootstrap`(초기 상태), `/api/version/<v>`(그 버전 전체 데이터), `/api/queue`, `/api/notifications`, `/api/usage`, `/api/prompts[/<name>]`, `/api/golden`, `/api/config/<name>`, `/api/engine_status`, `/api/insight/<v>`, `/api/output/<v>[/<file>]`, 정적(`/css /js /assets /slides /templates`).
 
-**POST**: `/api/login`, `/api/run`(작업 큐 투입), `/api/override`(등급 수정), `/api/schedule/{move,slot,plan,est}`, `/api/meetings/confirm`, `/api/plm/advance`(**mock — 실제 PLM으로 교체 지점**), `/api/followup`, `/api/query`, `/api/notifications/read`, `/api/config/<name>`, `/api/ingest/upload`, `/api/mapping/{assign,confirm}`, `/api/golden/{upload,delete}`, `/api/prompts/<name>`(저장).
+**POST**: `/api/login`, `/api/run`(작업 큐 투입), `/api/override`(등급 수정), `/api/schedule/{move,slot,plan,est}`, `/api/meetings/confirm`, `/api/plm/advance`(**mock — 실제 PLM으로 교체 지점**), `/api/followup`, `/api/query`, `/api/notifications/read`, `/api/mail_templates`(공지 메일 인사말/맺음말 팀 공유 저장), `/api/config/<name>`, `/api/ingest/upload`, `/api/mapping/{assign,confirm}`, `/api/golden/{upload,delete}`, `/api/prompts/<name>`(저장).
 
 - 예외 → 500 JSON. `ConflictError` → 409(낙관적 잠금 충돌).
 
@@ -160,7 +160,7 @@
 | `slideViewer(feature, plCheck)` | 슬라이드 좌우 뷰어(PL 지적 오버레이). |
 | `el(html)` / `fmtDate(s)` / `toast(msg, err)` | 유틸. |
 | `copyText(s)` / `copyRich(html, plain)` | 클립보드 복사. **secure context(localhost/https)면 navigator.clipboard, 사내 http면 execCommand 폴백** — 둘 다 지원해야 회사 배포에서 동작. |
-| `extractMails(s)` / `mailTableHtml(cols,rows,wideCols)` / `mailDraftModal(o)` | 공지 메일 초안 공용. `extractMails`는 셀에서 `.com` 메일만 추출. `mailDraftModal`은 수신자·제목·편집 가능 인사말/맺음말·표(검은 무채색, 긴 열 `wideCols`는 min-width, 기본 `["변경점"]`)·복사 버튼. `o.tableAtEnd`=false면 인사말·표·맺음말(일정 관리), true면 인사말·맺음말·표 맨 끝(회의). 담당자 **이름** 열은 표에, **메일주소** 열(`meeting_recipient_columns`)은 수신자에. `o.draftKey`(예: "schedule"/"meeting")를 주면 인사말/맺음말을 **localStorage에 종류별로 저장** — 한 번 다듬으면 다음 메일에도 유지("기본 문구로" 링크로 복원). 그래서 인사말 기본값엔 날짜를 넣지 않는다(날짜는 제목·표에). |
+| `extractMails(s)` / `mailTableHtml(cols,rows,wideCols)` / `mailDraftModal(o)` | 공지 메일 초안 공용. `extractMails`는 셀에서 `.com` 메일만 추출. `mailDraftModal`은 수신자·제목·편집 가능 인사말/맺음말·표(검은 무채색, 긴 열 `wideCols`는 min-width, 기본 `["변경점"]`)·복사 버튼. `o.tableAtEnd`=false면 인사말·표·맺음말(일정 관리), true면 인사말·맺음말·표 맨 끝(회의). 담당자 **이름** 열은 표에, **메일주소** 열(`meeting_recipient_columns`)은 수신자에. `o.draftKey`(예: "schedule"/"meeting")를 주면 인사말/맺음말을 **서버에 종류별 팀 공유 저장**(`POST /api/mail_templates`, blur 시) — 누가 다듬어도 다음 메일에 유지("기본 문구로" 링크로 복원). 그래서 인사말 기본값엔 날짜를 넣지 않는다(날짜는 제목·표에). `o.colWidths`({열:px})로 메일 표 열 너비를 고정한다(미지정 시 메일 클라이언트가 열을 균등 분배해버림 — 변경점은 wideCols min-width). |
 
 - **색 규칙**: P0=적, P1=호박, P2=회색, 리스크/미준비=경고색, **파랑=사람이 눌러야 할 곳**(AI 제안 대기).
 - **텍스트 배지 규칙**: 등급 딱지엔 P0/P1/P2/공유/보완만. 수정·확인·충돌 같은 플래그는 "판정 근거" 열로.
@@ -190,6 +190,7 @@
 | `actions.json` | `{rev, items:[{id, feature_index, action, owner_dept, due, plm_status, plm_id, report_needed, followup_scheduled}]}` |
 | `prediction_stats.json` | `{rev, runs:[{meeting_id, at, n, accuracy, detail:[{feature_index, predicted, actual, match}]}]}` |
 | `insight.md` | 인사이트 리포트 본문. |
+| `mail_templates.json` (전역, data/ 바로 아래) | 공지 메일 인사말/맺음말 팀 공유 저장: `{schedule:{top,bot}, meeting:{top,bot}}`. bootstrap이 실어 보낸다. |
 | `slides/ references/ output/ uploads/` | 슬라이드 PNG / 참고자료 / 산출물 / 업로드 원본. |
 
 ---

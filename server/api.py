@@ -132,6 +132,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(api_query(b))
             if path == "/api/notifications/read":
                 return self._json(api_notif_read(b))
+            if path == "/api/mail_templates":
+                return self._json(api_mail_templates(b))
             m = re.match(r"^/api/config/([\w]+)$", path)
             if m:
                 return self._json(api_config_save(m.group(1), b))
@@ -166,6 +168,7 @@ def api_bootstrap():
             "dev_done_rule": sc.get("dev_done_rule", {}),
             "ai_detail": sc.get("ai_detail", {}),
             "meeting_recipient_columns": sc.get("meeting_recipient_columns", []),
+            "mail_templates": store.load(store.dpath("mail_templates.json"), {}),
             "schema_fields": sc.get("fields", {}),
             "engine": {"default": eng.get("default_engine"), "names": list((eng.get("engines") or {}).keys())}}
 
@@ -443,6 +446,21 @@ def api_notif_read(b):
                 n["read_by"].append(user)
         return obj
     store.update(store.dpath("notifications.json"), fn)
+    return {"ok": True}
+
+
+def api_mail_templates(b):
+    """공지 메일 인사말/맺음말을 종류별로 팀 공유 저장. {schedule|meeting: {top, bot}}."""
+    key = b.get("key")
+    if not key:
+        raise ValueError("key 필요")
+    def fn(obj):
+        if b.get("reset"):
+            obj.pop(key, None)
+        else:
+            obj[key] = {"top": b.get("top", ""), "bot": b.get("bot", "")}
+        return obj
+    store.update(store.dpath("mail_templates.json"), fn, {})
     return {"ok": True}
 
 

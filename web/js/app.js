@@ -385,12 +385,13 @@ const App = {
   extractMails(s) { return String(s == null ? "" : s).match(/[^\s,;]+\.com\b/gi) || []; },
 
   // 메일에 붙여넣을 표 — 외부 CSS가 안 따라가므로 인라인. 색 강조 없이 검은색·무채색.
-  // wideCols: 넓게 잡을 열 이름 배열(예: 변경점) — 긴 텍스트가 세로로 눌리지 않게 min-width를 준다.
-  mailTableHtml(cols, rows, wideCols) {
-    const wide = wideCols || [];
+  // widths: {열이름:px} 고정 너비(메일 클라이언트가 열을 균등 분배하지 않게 명시) · wideCols: 너비 미지정 열이지만 좁게 눌리지 않게 min-width.
+  mailTableHtml(cols, rows, wideCols, widths) {
+    const wide = wideCols || [], w = widths || {};
     const e = s => String(s == null ? "" : s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    const th = ci => `padding:8px 11px;text-align:left;background:#eeeeee;color:#000000;font-weight:700;border:1px solid #999999;white-space:nowrap${wide.includes(cols[ci]) ? ";min-width:260px" : ""}`;
-    const td = ci => `padding:7px 11px;border:1px solid #cccccc;vertical-align:top;color:#000000${wide.includes(cols[ci]) ? ";min-width:260px" : ";white-space:nowrap"}`;
+    const sz = c => w[c] ? `width:${w[c]}px;` : (wide.includes(c) ? "min-width:260px;" : "");
+    const th = ci => `padding:8px 11px;text-align:left;background:#eeeeee;color:#000000;font-weight:700;border:1px solid #999999;white-space:nowrap;${sz(cols[ci])}`;
+    const td = ci => `padding:7px 11px;border:1px solid #cccccc;vertical-align:top;color:#000000;${sz(cols[ci])}${wide.includes(cols[ci]) ? "" : "white-space:nowrap;"}`;
     return `<table style="border-collapse:collapse;width:100%;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;color:#000000">
       <thead><tr>${cols.map((c, ci) => `<th style="${th(ci)}">${e(c)}</th>`).join("")}</tr></thead>
       <tbody>${rows.map((r, ri) => `<tr style="background:${ri % 2 ? "#f7f7f7" : "#ffffff"}">${r.map((v, ci) => `<td style="${td(ci)}">${e(v) || '<span style="color:#999999">—</span>'}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
@@ -399,17 +400,17 @@ const App = {
   // 공지 메일 초안 모달. tableAtEnd=false면 인사말·표·맺음말, true면 인사말·맺음말·표(맨 끝).
   mailDraftModal(o) {
     const e = s => String(s == null ? "" : s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    const tableHtml = this.mailTableHtml(o.cols, o.rows, o.wideCols || ["변경점"]);
+    const tableHtml = this.mailTableHtml(o.cols, o.rows, o.wideCols || ["변경점"], o.colWidths);
     const tableBox = `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;background:#fff;overflow-x:auto">${tableHtml}</div>`;
     const tsv = [o.cols.join("\t"), ...o.rows.map(r => r.map(v => String(v == null ? "" : v).replace(/\s+/g, " ")).join("\t"))].join("\n");
-    // 종류별(draftKey) 인사말/맺음말을 이 브라우저에 저장 — 한 번 다듬으면 다음 메일에도 유지된다.
-    const dk = o.draftKey ? "maildraft:" + o.draftKey : null;
-    const load = suf => (dk ? localStorage.getItem(dk + suf) : null);
-    const topInit = load(":top") != null ? load(":top") : o.topDefault;
-    const botInit = load(":bot") != null ? load(":bot") : o.botDefault;
+    // 종류별(draftKey) 인사말/맺음말을 서버에 팀 공유 저장 — 누가 다듬어도 다음 메일에 유지된다.
+    const dk = o.draftKey || null;
+    const saved = (dk && (this.state.boot.mail_templates || {})[dk]) || {};
+    const topInit = saved.top != null ? saved.top : o.topDefault;
+    const botInit = saved.bot != null ? saved.bot : o.botDefault;
     const resetLink = suf => dk ? ` <a href="#" data-reset="${suf}" style="font-weight:400;font-size:11px;color:var(--accent)">기본 문구로</a>` : "";
-    const topLbl = `<div class="section-label" style="margin-top:14px">인사말 <span style="font-weight:400;text-transform:none">— 편집 가능 · 저장됨${resetLink("top")}</span></div>`;
-    const botLbl = `<div class="section-label" style="margin-top:12px">맺음말 <span style="font-weight:400;text-transform:none">— 편집 가능 · 저장됨${resetLink("bot")}</span></div>`;
+    const topLbl = `<div class="section-label" style="margin-top:14px">인사말 <span style="font-weight:400;text-transform:none">— 편집 가능 · 팀 공유 저장${resetLink("top")}</span></div>`;
+    const botLbl = `<div class="section-label" style="margin-top:12px">맺음말 <span style="font-weight:400;text-transform:none">— 편집 가능 · 팀 공유 저장${resetLink("bot")}</span></div>`;
     const tblLbl = `<div class="section-label" style="margin-top:12px">아이템 표 <span style="font-weight:400;text-transform:none">— 자동 (수정 불가)</span></div>`;
     const ta = (id, v) => `<textarea id="${id}" rows="2" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:8px;resize:vertical">${e(v)}</textarea>`;
     const middle = o.tableAtEnd
@@ -434,15 +435,19 @@ const App = {
 
     const topEl = wrap.querySelector("#mail-top"), botEl = wrap.querySelector("#mail-bot");
     if (dk) {
-      // 편집 즉시 저장 → 다음에 같은 종류 메일을 열면 이 문구가 뜬다
-      topEl.oninput = () => localStorage.setItem(dk + ":top", topEl.value);
-      botEl.oninput = () => localStorage.setItem(dk + ":bot", botEl.value);
-      wrap.querySelectorAll("[data-reset]").forEach(a => a.onclick = ev => {
+      // 포커스 아웃 시 서버에 저장 → 다음에 같은 종류 메일을 열면(누가 열어도) 이 문구가 뜬다
+      const save = async () => {
+        const top = topEl.value, bot = botEl.value;
+        try { await this.api("/api/mail_templates", { key: dk, top, bot }); } catch (e) { this.toast("메일 문구 저장 실패", true); return; }
+        this.state.boot.mail_templates = this.state.boot.mail_templates || {};
+        this.state.boot.mail_templates[dk] = { top, bot };
+      };
+      topEl.onblur = save; botEl.onblur = save;
+      wrap.querySelectorAll("[data-reset]").forEach(a => a.onclick = async ev => {
         ev.preventDefault();
         const suf = a.dataset.reset;
-        const el = suf === "top" ? topEl : botEl;
-        el.value = suf === "top" ? o.topDefault : o.botDefault;
-        localStorage.removeItem(dk + ":" + suf);
+        (suf === "top" ? topEl : botEl).value = suf === "top" ? o.topDefault : o.botDefault;
+        await save();
       });
     }
 
