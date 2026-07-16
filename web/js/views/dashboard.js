@@ -69,20 +69,20 @@ App.register("dashboard", {
               foot: `${devDone.length}건 · 기준: ${dvRule.mode === "values"
                 ? `'${dvRule.column}' = ${(dvRule.values || []).join(", ")}`
                 : `'${dvRule.column}' 값 있음`}`,
-              color: "var(--good)", drill: "devdone" })
+              color: "var(--good)", drill: "cond:devdone" })
           : `<div class="kpi" data-drill="settings" title="설정에서 완료 판정 규칙을 지정하세요">
                <div class="lbl"><span>개발 완료 진행률</span></div>
                <div class="num" style="font-size:15px;color:var(--accent)">설정 필요</div>
                <div class="foot">설정 → 개발 완료 판정 규칙 지정</div></div>`}
-        ${kpi("PL 통과율", plReady.length, plChecked.length || 1, { foot: `미준비 ${plChecked.length - plReady.length}건`, color: "var(--serious)", drill: "notready" })}
+        ${kpi("PL 통과율", plReady.length, plChecked.length || 1, { foot: `미준비 ${plChecked.length - plReady.length}건`, color: "var(--serious)", drill: "cond:notready" })}
         ${dvrSet
-          ? kpi("일정 리스크 있음", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: `개발 일정 > DVR (${d.schedule.dvr}) 또는 일정 미정`, drill: "risk" })
+          ? kpi("일정 리스크 있음", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: `개발 일정 > DVR (${d.schedule.dvr}) 또는 일정 미정`, drill: "cond:risk" })
           : `<div class="kpi" data-drill="dvr" title="회의 화면에서 DVR을 지정하세요">
                <div class="lbl"><span>일정 리스크</span></div>
                <div class="num" style="font-size:15px;color:var(--accent)">DVR 필요</div>
                <div class="foot">회의 → 과제 일정에서 DVR 지정</div></div>`}
-        ${kpi("사람 확인 필요", needsHuman.length, null, { cls: needsHuman.length ? "blue" : "", foot: "AI 판단 보류", drill: "needs_human" })}
-        ${kpi("결정 완료", decided.length, alive.length, { foot: `지원 ${decDist("support")} · 보류 ${decDist("hold")}`, drill: "decided" })}
+        ${kpi("사람 확인 필요", needsHuman.length, null, { cls: needsHuman.length ? "blue" : "", foot: "AI 판단 보류", drill: "cond:needs_human" })}
+        ${kpi("결정 완료", decided.length, alive.length, { foot: `지원 ${decDist("support")} · 보류 ${decDist("hold")}`, drill: "stage:decided" })}
       </div>
 
       <div class="grid" style="grid-template-columns: 1.2fr 1fr; align-items:start">

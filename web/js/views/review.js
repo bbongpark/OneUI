@@ -46,9 +46,10 @@ App.register("review", {
         </tr></thead><tbody id="rows"></tbody>
       </table></div></div>`;
 
-    // 현황판 드릴다운(?f=) — 결정됨만 단계, 나머지는 조건
-    if (preset && preset !== "all")
-      el.querySelector(preset === "decided" ? "#f-stage" : "#f-cond").value = preset;
+    // 현황판 드릴다운(?f=) — 값에 대상 필터가 접두사로 담겨 온다: "stage:decided" / "cond:risk"
+    const [pKind, pVal] = preset.split(":");
+    const pSel = { stage: "#f-stage", cond: "#f-cond" }[pKind];
+    if (pSel && pVal) el.querySelector(pSel).value = pVal;
     const gPreset = (location.hash.split("?g=")[1] || "");     // 현황판 등급 범례에서 넘어온 경우
     if (gPreset && App.GRADES[gPreset]) el.querySelector("#f-grade").value = gPreset;
 
