@@ -155,31 +155,28 @@ def _seed(s):
 
 def _mock(persona, payload):
     feats = payload.get("features", [])
+    # 부문 페르소나 — 등급은 매기지 않고 검토 의견만
     if persona.startswith("persona-") and persona not in ("persona-synthesis", "persona-pl", "persona-sw-director"):
         res = []
         for ft in feats:
             r = _seed(persona + ft["feature_index"])
-            res.append({"feature_index": ft["feature_index"],
-                        "grade": r.choices(AI_GRADES, weights=[18, 45, 37])[0],
-                        "status": "ok", "reason": "",
-                        "rationale": "(mock) %s 관점 자동 분류 — 실제 엔진 연결 시 교체됨" % persona,
+            res.append({"feature_index": ft["feature_index"], "status": "ok", "reason": "",
+                        "opinion": "(mock) %s 관점 검토 의견 — 실제 엔진 연결 시 교체됨" % persona,
                         "key_question": r.choice(["폴더블 시나리오 검증 여부?", "VOC 집계 기간?", ""])})
         return {"persona": persona, "results": res}
+    # 종합 — 등급을 매기는 유일한 페르소나
     if persona == "persona-synthesis":
         res = []
         for ft in feats:
-            pr = ft.get("personas", {})
-            grades = [v["grade"] for v in pr.values()] or ["P1"]
-            fg = min(grades, key=lambda g: GRADE_ORDER.get(g, 9))    # P0 > P1 > P2
-            spread = max(GRADE_ORDER.get(g, 9) for g in grades) - min(GRADE_ORDER.get(g, 9) for g in grades)
-            div = spread >= 2
             r = _seed("syn" + ft["feature_index"])
+            fg = r.choices(AI_GRADES, weights=[22, 45, 33])[0]
+            div = r.random() < 0.22
             res.append({"feature_index": ft["feature_index"], "final_grade": fg,
                         "divergent": div,
-                        "divergent_summary": "부문 간 등급이 %s로 갈림" % "/".join(sorted(set(grades))) if div else "",
-                        "rationale": "(mock) 4개 부문 등급 종합", "meeting_questions": ["핵심 쟁점 확인 필요?"] if div else [],
+                        "divergent_summary": "(mock) 부문 간 인식 차 — 기획은 전략 과제, 개발은 일정 우려" if div else "",
+                        "rationale": "(mock) 4개 부문 의견 종합", "meeting_questions": ["핵심 쟁점 확인 필요?"] if div else [],
                         "status": "needs_human" if (div and r.random() < 0.25) else "ok",
-                        "reason": "부문 등급 정면 충돌" if div else ""})
+                        "reason": "부문 의견 정면 충돌" if div else ""})
         return {"persona": "synthesis", "results": res}
     if persona == "persona-pl":
         res = []

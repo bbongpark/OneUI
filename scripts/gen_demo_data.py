@@ -69,7 +69,7 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             ux_d + datetime.timedelta(days=random.randint(14, 55))
         # 변경점: 대부분 템플릿을 지키지만 일부는 부실 → 하드룰이 '자료 보완 필요'로 판정
         ctype = random.choice(CHANGE_TYPES)
-        bad = random.random() < 0.12
+        bad = random.random() < 0.1
         change = random.choice(["개선함", "수정", "-", "TBD"]) if bad else \
             f"[변경 전] 기존 {name.split()[0]} 동작 유지 → [변경 후] {name} 적용. 사유: 사용성 개선 및 VOC 대응. 영향: {dept} 모듈."
         row = {
@@ -100,35 +100,49 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             "slides": [f"{idx}_{k}.svg" for k in range(1, 4)] if i <= 12 else ([f"{idx}_1.svg"] if i % 3 else []),
             "reregistered_from": reregistered, "input_changed": (i % 23 == 0 and st_reviewed),
         })
-        if st_reviewed or status == "reviewing":
+        # 변경점이 부실하면 규칙이 앞단에서 '자료 보완 필요'로 확정 — AI를 부르지 않는다
+        if bad and (st_reviewed or status == "reviewing"):
+            why = "'변경점'이 자리채움 값('%s')" % change if change in ("-", "TBD") else \
+                  "'변경점'이 %d자로 너무 짧음 (최소 20자)" % len(change)
+            reviews[idx] = {"personas": {}, "input_hash": h(idx + "in"),
+                            "hard_rule": {"grade": "DOC", "reason": why},
+                            "synthesis": {"feature_index": idx, "final_grade": "DOC", "divergent": False,
+                                          "divergent_summary": "", "rationale": "규칙: " + why,
+                                          "meeting_questions": [], "status": "ok", "reason": "", "by_rule": True}}
+        elif st_reviewed or status == "reviewing":
             done = PERSONAS if st_reviewed else PERSONAS[: random.randint(1, 3)]
+            # 부문 페르소나는 의견만 (등급은 종합이 매긴다)
             pr = {}
             for p in done:
-                g = random.choices(AI_GRADES, weights=[18, 45, 37])[0]
-                pr[p] = {"grade": g, "rationale": random.choice(RATIONALES[p]),
+                pr[p] = {"opinion": random.choice(RATIONALES[p]),
                          "key_question": random.choice(KEYQ), "status": "ok"}
             entry = {"personas": pr, "prompt_hash": "a1b2c3", "input_hash": h(idx + "in")}
             if st_reviewed:
-                grades = [v["grade"] for v in pr.values()]
-                fg = min(grades, key=lambda g: G_ORDER[g])          # P0 > P1 > P2
-                spread = max(G_ORDER[g] for g in grades) - min(G_ORDER[g] for g in grades)
-                div = spread >= 2
+                fg = random.choices(AI_GRADES, weights=[22, 45, 33])[0]
+                div = random.random() < 0.22
                 needs_h = div and random.random() < 0.15
-                entry["synthesis"] = {
+                syn = {
                     "final_grade": fg,
                     "divergent": div,
-                    "divergent_summary": "부문 간 등급이 %s로 갈림" % "/".join(sorted(set(grades))) if div else "",
-                    "rationale": "부문 간 등급 차이가 커 회의에서 인식 정렬 필요" if div else "부문 등급 일치, 근거 충분",
+                    "divergent_summary": "부문 간 인식 차 — 기획은 전략 과제, 개발은 일정 우려" if div else "",
+                    "rationale": "부문 간 인식 차가 커 회의에서 정렬 필요" if div else "부문 의견 일치, 쟁점 제한적",
                     "meeting_questions": [q for q in random.sample(KEYQ[:5], 2)],
                     "status": "needs_human" if needs_h else "ok",
-                    "reason": "부문 등급이 정면 충돌하며 근거가 모두 타당" if needs_h else "",
+                    "reason": "부문 의견이 정면 충돌하며 근거가 모두 타당" if needs_h else "",
                 }
+                # P2 중 단순 공유는 규칙이 고른다 (변경유형이 문구/오타 수정)
+                if fg == "P2" and row["변경유형"] in ("문구 수정", "오타 수정"):
+                    syn["ai_grade"] = "P2"
+                    syn["final_grade"] = "SHARE"
+                    syn["rationale"] = "규칙: 변경 유형이 문구·오타 수정 (AI 판정 P2 → 단순 공유)"
+                    entry["share_rule"] = {"reason": "(예시) 변경 유형이 문구·오타 수정이면 공유"}
+                entry["synthesis"] = syn
                 if random.random() < 0.08:
                     entry["override"] = {"field": "final_grade", "from": fg,
                                          "to": random.choice([g for g in ("P0", "P1", "P2") if g != fg]),
                                          "by": "관리자", "reason": "전략 과제로 상향", "at": NOW + "T10:20:00"}
             reviews[idx] = entry
-        if st_reviewed:
+        if st_reviewed and not bad:
             issues_doc = [] if random.random() < 0.62 else [random.choice(["'VOC건수' 미기입", "'변경점' 템플릿 미준수 — 영향 범위 없음", "'적용모델' 미기입"])]
             issues_slide = [] if random.random() < 0.7 else [{"slide": random.randint(1, 3), "issue": random.choice(["우측 상단 표 2칸 빈칸", "VOC 언급에 정량 수치 없음", "변경 전/후 비교 슬라이드 없음"])}]
             plc[idx] = {"ready": not issues_doc and not issues_slide, "doc_issues": issues_doc,

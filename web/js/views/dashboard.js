@@ -11,8 +11,8 @@ App.register("dashboard", {
     const devDone = dvRule.column ? alive.filter(f => app.isDevDone(f)) : [];
     const plChecked = alive.filter(f => pl[f.feature_index]);
     const plReady = plChecked.filter(f => pl[f.feature_index].ready);
-    // 일정 리스크 = 결정적 규칙 (개발 일정 > DVR). PL 검사 실행 전에도 즉시 판정된다
-    const riskHigh = alive.filter(f => app.scheduleRisk(f).level === "high");
+    // 일정 리스크 = 결정적 규칙 (개발 일정 > DVR). 있음/없음 두 가지. PL 검사 전에도 즉시 판정
+    const riskHigh = alive.filter(f => app.scheduleRisk(f).risk === true);
     const dvrSet = !!(d.schedule || {}).dvr;
     const needsHuman = alive.filter(f => (rv[f.feature_index]?.synthesis || {}).status === "needs_human");
     const decided = alive.filter(f => f.status === "decided");
@@ -76,7 +76,7 @@ App.register("dashboard", {
                <div class="foot">설정 → 개발 완료 판정 규칙 지정</div></div>`}
         ${kpi("PL 통과율", plReady.length, plChecked.length || 1, { foot: `미준비 ${plChecked.length - plReady.length}건`, color: "var(--serious)", drill: "notready" })}
         ${dvrSet
-          ? kpi("일정 리스크", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: `개발 일정 > DVR (${d.schedule.dvr})`, drill: "risk" })
+          ? kpi("일정 리스크 있음", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: `개발 일정 > DVR (${d.schedule.dvr}) 또는 일정 미정`, drill: "risk" })
           : `<div class="kpi" data-drill="dvr" title="회의 화면에서 DVR을 지정하세요">
                <div class="lbl"><span>일정 리스크</span></div>
                <div class="num" style="font-size:15px;color:var(--accent)">DVR 필요</div>

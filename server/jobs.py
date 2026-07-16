@@ -103,30 +103,28 @@ def job_review(job):
     reviews = store.load(rv_fp, {"rev": 0, "items": {}})
     alive = [f for f in feats if f["status"] != "decided" and f.get("decision") != "rejected"]
 
-    # ① 하드룰 — 걸린 건은 AI를 호출하지 않는다 (판정 확정 + 토큰 절약)
+    # ① 자료 보완 필요(DOC) — 변경점이 부실하면 AI가 판단할 수 없다. 앞단에서 거른다
     hard = {}
     for f in alive:
-        g, why = grading.hard_grade(f["row"])
-        if g:
-            hard[f["feature_index"]] = (g, why)
+        why = grading.doc_check(f["row"])
+        if why:
+            hard[f["feature_index"]] = ("DOC", why)
     if hard:
         def apply_hard(obj):
             for idx, (g, why) in hard.items():
                 it = obj["items"].setdefault(idx, {"personas": {}})
                 it["hard_rule"] = {"grade": g, "reason": why}
-                it["personas"] = {}                       # AI 판정은 없다
+                it["personas"] = {}                       # AI를 부르지 않았다
                 it["synthesis"] = {"feature_index": idx, "final_grade": g, "divergent": False,
-                                   "divergent_summary": "", "rationale": "하드룰: " + why,
+                                   "divergent_summary": "", "rationale": "규칙: " + why,
                                    "meeting_questions": [], "status": "ok", "reason": "", "by_rule": True}
                 ft = next(x for x in alive if x["feature_index"] == idx)
                 it["input_hash"] = ft["row_hash"]
             return obj
         reviews = store.update(rv_fp, apply_hard, {"rev": 0, "items": {}})
-        n_doc = sum(1 for g, _ in hard.values() if g == "DOC")
-        n_share = len(hard) - n_doc
-        log("하드룰 확정: 자료 보완 %d건 · 단순 공유 %d건 (AI 호출 제외)" % (n_doc, n_share))
+        log("자료 보완 필요 %d건 — AI 호출 제외" % len(hard))
 
-    # ② 나머지만 AI가 P0/P1/P2 판정
+    # ② 나머지만 부문 페르소나가 검토 의견 작성 (등급은 종합이 매긴다)
     targets = [f for f in alive if f["feature_index"] not in hard]
     for pname in only:
         key = pname.replace("persona-", "").replace("experience-planning", "experience_planning")
@@ -146,7 +144,7 @@ def job_review(job):
                 for r in out.get("results", []):
                     it = obj["items"].setdefault(r["feature_index"], {"personas": {}})
                     it["personas"][key] = {k: r.get(k) for k in
-                                           ("grade", "rationale", "key_question", "status", "reason")}
+                                           ("opinion", "key_question", "status", "reason")}
                     ft = next((x for x in batch if x["feature_index"] == r["feature_index"]), None)
                     if ft:
                         it["input_hash"] = ft["row_hash"]
@@ -164,8 +162,8 @@ def job_review(job):
                     f["status"] = "reviewing"
         return obj
     store.update(store.dpath(v, "features.json"), fst)
-    store.notify("job", "리뷰 완료 (%s) — AI 판정 %d건%s" %
-                 (v, len(targets), " · 하드룰 확정 %d건" % len(hard) if hard else ""))
+    store.notify("job", "부문 검토 완료 (%s) — %d건%s" %
+                 (v, len(targets), " · 자료 보완 필요 %d건(규칙)" % len(hard) if hard else ""))
     enqueue("synthesis", v, job["user"])
 
 
@@ -178,8 +176,9 @@ def job_synthesis(job):
     ready = [f for f in feats if len(reviews["items"].get(f["feature_index"], {}).get("personas", {})) == 4
              and not reviews["items"].get(f["feature_index"], {}).get("hard_rule")
              and f.get("decision") != "rejected"]
+    fmap = {f["feature_index"]: f for f in feats}
     for batch in _batches(ready, v):
-        payload = {"features": [{"feature_index": f["feature_index"],
+        payload = {"features": [{"feature_index": f["feature_index"], "row": _row_view(f["row"]),
                                  "personas": reviews["items"][f["feature_index"]]["personas"]} for f in batch]}
         out = engines.run("persona-synthesis", _prompt("persona-synthesis"), payload)
         def apply(obj):
@@ -187,6 +186,15 @@ def job_synthesis(job):
                 it = obj["items"].setdefault(r["feature_index"], {})
                 if "override" in it:  # 사람 오버라이드 존중 — 값은 두고 AI 원판정만 갱신
                     r["overridden"] = True
+                # ③ P2(서면보고) 중 단순 공유로 내릴 건은 하드룰이 고른다
+                it.pop("share_rule", None)
+                if r.get("final_grade") == "P2":
+                    why = grading.share_check((fmap.get(r["feature_index"], {}) or {}).get("row", {}))
+                    if why:
+                        r["ai_grade"] = "P2"                 # AI 원판정은 남겨둔다
+                        r["final_grade"] = "SHARE"
+                        r["rationale"] = "규칙: " + why + " (AI 판정 P2 → 단순 공유)"
+                        it["share_rule"] = {"reason": why}
                 it["synthesis"] = r
             return obj
         reviews = store.update(rv_fp, apply, {"rev": 0, "items": {}})
@@ -198,7 +206,10 @@ def job_synthesis(job):
         return obj
     store.update(store.dpath(v, "features.json"), fst)
     nh = sum(1 for i in reviews["items"].values() if (i.get("synthesis") or {}).get("status") == "needs_human")
-    store.notify("job", "종합 판정 완료 (%s)%s" % (v, " — 사람 확인 필요 %d건" % nh if nh else ""))
+    ns = sum(1 for i in reviews["items"].values() if i.get("share_rule"))
+    store.notify("job", "종합 등급 판정 완료 (%s)%s%s" %
+                 (v, " — 사람 확인 필요 %d건" % nh if nh else "",
+                  " · P2 중 단순 공유 %d건(규칙)" % ns if ns else ""))
 
 
 def job_pl(job):

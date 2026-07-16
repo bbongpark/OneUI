@@ -8,12 +8,11 @@ App.register("review", {
     (d.schedule.slots || []).forEach(s => s.items.forEach(i => { if (i.predicted) predMap[i.feature_index] = i.predicted; }));
     const readonly = d.features.readonly;
     const preset = (location.hash.split("?f=")[1] || "");
-    const P_LBL = { experience_planning: "기획", ux: "UX", dev: "개발", cxi: "CXI" };
 
     el.innerHTML = `
       <div class="page-head">
         <div><div class="page-title">리뷰 보드</div>
-        <div class="page-sub">부문별 등급 → 종합 등급 (오버라이드 가능) · 결정은 회의에서 · P0/P1만 대면 회의 대상</div></div>
+        <div class="page-sub">종합 에이전트가 부문 의견을 보고 등급 1개 결정 (오버라이드 가능) · 규칙: 자료 보완 / P2 중 단순 공유 · 결정은 회의에서</div></div>
         <div class="actions">
           <button class="btn" id="map-btn"></button>
           <button class="btn" data-run="review">리뷰 실행 (등급 분류)</button><button class="btn" data-run="synthesis">종합만 재실행</button>
@@ -36,7 +35,7 @@ App.register("review", {
       </div>
       <div class="card"><div class="tbl-wrap" style="max-height:calc(100vh - 250px);overflow-y:auto">
         <table class="tbl"><thead><tr>
-          <th>인덱스</th><th>Feature</th><th>부서</th><th>부문 등급</th><th>종합 등급</th><th>결정</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
+          <th>인덱스</th><th>Feature</th><th>부서</th><th>등급</th><th>판정 근거</th><th>결정</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
         </tr></thead><tbody id="rows"></tbody>
       </table></div></div>`;
 
@@ -57,7 +56,7 @@ App.register("review", {
         if (fd && f.department !== fd) return false;
         if (fs === "needs_human" && syn.status !== "needs_human") return false;
         if (fs === "notready" && (plc.ready !== false)) return false;
-        if (fs === "risk" && app.scheduleRisk(f).level !== "high") return false;
+        if (fs === "risk" && app.scheduleRisk(f).risk !== true) return false;
         if (fs === "divergent" && !syn.divergent) return false;
         if (fs === "rereg" && !f.reregistered_from) return false;
         if (fs === "decided" && f.status !== "decided") return false;
@@ -68,23 +67,23 @@ App.register("review", {
       rows.innerHTML = list.map(f => {
         const it = rv[f.feature_index] || {}, syn = it.synthesis || {}, plc = pl[f.feature_index] || {};
         const per = it.personas || {};
-        // 부문별 등급 — 각 부문이 이 건을 어떤 비중으로 봤는지. 하드룰 확정 건은 AI를 안 부른다
-        const perHtml = it.hard_rule
-          ? `<span class="badge ${(App.GRADES[it.hard_rule.grade] || {}).cls}" title="규칙으로 확정: ${it.hard_rule.reason}">⚙ 규칙 확정</span>`
-          : Object.keys(P_LBL).map(k => per[k]
-              ? `<span class="badge ${(App.GRADES[per[k].grade] || {}).cls || "b-outline"}" title="${P_LBL[k]}: ${(App.GRADES[per[k].grade] || {}).full || ""} — ${per[k].rationale}">${P_LBL[k]} ${(App.GRADES[per[k].grade] || {}).label || "?"}</span>`
-              : `<span class="badge b-outline">${P_LBL[k]}</span>`).join(" ");
+        // 등급을 어떻게 정했는지 — 규칙 확정 / 종합 AI가 4개 부문 의견을 보고
+        const nPer = Object.keys(per).length;
+        const why = it.hard_rule ? `<span class="badge b-doc" title="${it.hard_rule.reason}">⚙ 규칙</span>`
+          : it.share_rule ? `<span class="badge b-share" title="${it.share_rule.reason} (AI 판정 P2)">⚙ 규칙</span>`
+          : syn.final_grade ? `<span style="font-size:11.5px;color:var(--text-2)" title="${syn.rationale || ""}">부문 ${nPer}개 의견 종합</span>`
+          : `<span class="badge b-outline">미실행</span>`;
         const pred = predMap[f.feature_index];
         return `<tr class="clickable" data-idx="${f.feature_index}">
           <td class="idx">${f.feature_index}${f.reregistered_from ? ` <span class="badge b-violet" title="이전 버전 ${f.reregistered_from}에서 거절/보류된 건의 재등록">재등록</span>` : ""}${f.input_changed ? ` <span class="badge b-blue" title="리뷰 후 입력이 변경됨 — 재확인 필요">입력변경</span>` : ""}</td>
           <td class="name" title="${f.name}">${f.name}</td>
           <td>${f.department}</td>
-          <td><div class="tag-row">${perHtml}</div></td>
           <td>${app.gradeBadge(syn.final_grade)}${it.override ? ' <span title="사람이 수정함 (' + it.override.by + ')">✍</span>' : ""}${syn.status === "needs_human" ? ' <span class="badge b-blue">확인</span>' : ""}${syn.divergent ? ' <span class="badge b-cgo" title="' + (syn.divergent_summary || "") + '">충돌</span>' : ""}</td>
+          <td>${why}</td>
           <td>${f.decision ? app.recBadge(f.decision === "rejected" ? "rejected" : f.decision) : '<span class="badge b-outline">회의 전</span>'}</td>
           <td>${f.decision ? '<span class="badge b-outline" title="실제 결정 확정됨">확정</span>' : pred ? app.recBadge(pred.predicted_decision) + `<span style="font-size:10px;color:var(--text-3)"> ${pred.confidence}</span>` : '<span class="badge b-outline">—</span>'}</td>
           <td>${plc.ready === true ? '<span class="badge b-go">준비</span>' : plc.ready === false ? '<span class="badge b-nogo" title="' + [(plc.doc_issues || []).join(", "), (plc.slide_issues || []).map(x => "슬라이드" + x.slide + ": " + x.issue).join(", ")].filter(Boolean).join(" · ") + '">미준비</span>' : '<span class="badge b-outline">—</span>'}</td>
-          <td>${(r => `<span class="badge b-risk-${r.level}" title="${r.reason}">${{ high: "높음", caution: "주의", normal: "정상", unknown: "미확인" }[r.level]}</span>`)(app.scheduleRisk(f))}</td>
+          <td>${app.riskBadge2(f)}</td>
           <td>${app.statusBadge(f.status)}</td>
           <td>${f.slides.length ? `<button class="btn ghost small" data-slides="${f.feature_index}" title="발표 자료 보기">🖼 ${f.slides.length}</button>` : ""}</td>
         </tr>`;
@@ -110,32 +109,31 @@ App.register("review", {
              ? app.state.boot.managed_columns : Object.keys(f.row))
             .filter(c => f.row[c] !== undefined)
             .map(c => `<dt title="관리 열">${c}</dt><dd style="font-size:12px">${f.row[c] || '<span style="color:var(--text-3)">미기재</span>'}</dd>`).join("")}
-          <dt>일정 리스크</dt><dd>${(r => `<span class="badge b-risk-${r.level}">${{ high: "높음", caution: "주의", normal: "정상", unknown: "미확인" }[r.level]}</span>
-            <span style="font-size:11.5px;color:var(--text-2)"> ${r.reason}</span>`)(app.scheduleRisk(f))}</dd>
+          <dt>일정 리스크</dt><dd>${app.riskBadge2(f)}
+            <span style="font-size:11.5px;color:var(--text-2)"> ${app.scheduleRisk(f).reason}</span></dd>
           ${f.reregistered_from ? `<dt>재등록</dt><dd><span class="badge b-violet">${f.reregistered_from}에서 거절/보류 → 재등록</span></dd>` : ""}
           ${f.decision ? `<dt>임원 결정</dt><dd>${app.recBadge(f.decision === "rejected" ? "rejected" : f.decision)} ${(f.decision_conditions || []).join(", ")}</dd>` : ""}
         </div>
-        ${it.hard_rule ? `<div class="section-label">규칙 확정</div>
-          <div class="info-banner">⚙ <b>${(App.GRADES[it.hard_rule.grade] || {}).full}</b> — ${it.hard_rule.reason}
-            <div style="font-size:11px;margin-top:3px">하드룰로 확정된 건이라 AI 페르소나를 호출하지 않았습니다 (설정: config/grade_rules.json)</div></div>` : ""}
-        <div class="section-label">부문별 등급</div>
-        <div class="persona-scores">
-          ${it.hard_rule ? '<div class="pscore" style="grid-column:1/-1"><div class="rat">규칙으로 확정되어 AI 판정 없음</div></div>' :
-            Object.entries({ experience_planning: "경험기획", ux: "UX", dev: "개발", cxi: "CXI" }).map(([k, lbl]) => per[k] ? `
-            <div class="pscore"><div class="ph"><span>${lbl}</span><span>${app.gradeBadge(per[k].grade)}</span></div>
-            <div class="rat">${per[k].rationale}</div>
-            ${per[k].key_question ? `<div class="rat" style="color:var(--accent)">Q. ${per[k].key_question}</div>` : ""}</div>` :
-            `<div class="pscore"><div class="ph"><span>${lbl}</span><span class="badge b-outline">미실행</span></div></div>`).join("")}
-        </div>
-        <div class="section-label">종합 등급</div>
+        <div class="section-label">등급</div>
         ${syn.final_grade ? `
           <div class="pscore"><div class="ph"><span>${app.gradeBadge(syn.final_grade)}
             <span style="font-weight:400;color:var(--text-2);font-size:11.5px">${(App.GRADES[syn.final_grade] || {}).full || ""}</span></span>
             ${syn.status === "needs_human" ? '<span class="badge b-blue">사람 확인 필요</span>' : ""}</div>
           <div class="rat">${syn.rationale || ""}</div>
+          ${syn.ai_grade ? `<div class="rat" style="color:var(--text-3)">AI 종합 판정: ${syn.ai_grade} → 규칙으로 조정됨</div>` : ""}
           ${syn.divergent ? `<div class="rat" style="color:var(--serious)">⚡ ${syn.divergent_summary}</div>` : ""}
           ${(syn.meeting_questions || []).map(q => `<div class="rat" style="color:var(--accent)">회의 질문: ${q}</div>`).join("")}</div>` :
-          '<div class="empty" style="padding:14px 0">종합 등급 없음 — ② 리뷰 실행 필요</div>'}
+          '<div class="empty" style="padding:14px 0">등급 없음 — ② 리뷰 실행 필요</div>'}
+        ${it.hard_rule ? `<div class="info-banner" style="margin-top:8px">⚙ 규칙으로 확정 — AI를 호출하지 않았습니다 (config/grade_rules.json)</div>` : ""}
+        ${Object.keys(per).length ? `
+          <div class="section-label">부문 검토 의견 <span style="font-weight:400;text-transform:none">— 종합 페르소나가 이 의견들을 보고 등급을 정합니다</span></div>
+          <div class="persona-scores">
+            ${Object.entries({ experience_planning: "경험기획", ux: "UX", dev: "개발", cxi: "CXI" }).map(([k, lbl]) => per[k] ? `
+              <div class="pscore"><div class="ph"><span>${lbl}</span></div>
+              <div class="rat">${per[k].opinion || ""}</div>
+              ${per[k].key_question ? `<div class="rat" style="color:var(--accent)">Q. ${per[k].key_question}</div>` : ""}</div>` :
+              `<div class="pscore"><div class="ph"><span>${lbl}</span><span class="badge b-outline">미실행</span></div></div>`).join("")}
+          </div>` : ""}
         ${(it.history || []).length ? `<div class="section-label">수정 이력</div>` +
           it.history.map(h => `<div style="font-size:11.5px;color:var(--text-2);padding:2px 0">· ${App.fmtDate(h.at)} <b>${h.by}</b>: ${h.field} ${h.from || "—"} → ${h.to} (${h.reason || "사유 없음"})</div>`).join("") : ""}
       `);

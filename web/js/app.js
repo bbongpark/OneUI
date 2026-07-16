@@ -210,22 +210,31 @@ const App = {
     return isNaN(d) ? null : d;
   },
 
+  // 리스크는 있음 / 없음 두 가지 (설정 전에는 미설정)
   scheduleRisk(f) {
     const dvr = this.parseDate((this.state.data.schedule || {}).dvr);
     const fields = (this.state.boot.schema_fields) || {};
     const uxCol = fields.ux_schedule, devCol = fields.dev_schedule;
-    if (!dvr || !devCol) return { level: "unknown", reason: !dvr ? "DVR 미설정 — 회의 화면에서 과제 일정 지정" : "개발 일정 열 미지정 — 설정에서 연결" };
+    if (!dvr || !devCol) return { risk: null, reason: !dvr ? "DVR 미설정 — 회의 화면에서 과제 일정 지정" : "개발 일정 열 미지정 — 설정에서 연결" };
     const row = f.row || {};
     const dev = this.parseDate(row[devCol]);
     const ux = uxCol ? this.parseDate(row[uxCol]) : null;
     if (dev) {
       const over = Math.round((dev - dvr) / 86400000);
       return over > 0
-        ? { level: "high", reason: `개발 일정(${row[devCol]})이 DVR을 ${over}일 초과` }
-        : { level: "normal", reason: `개발 일정(${row[devCol]}) DVR 이내 (${-over}일 여유)` };
+        ? { risk: true, reason: `개발 일정(${row[devCol]})이 DVR을 ${over}일 초과` }
+        : { risk: false, reason: `개발 일정(${row[devCol]}) DVR 이내 (${-over}일 여유)` };
     }
-    if (uxCol && !ux) return { level: "high", reason: "UX 일정 미정 — 개발 일정을 산출할 수 없음" };
-    return { level: "caution", reason: "개발 일정 미정" + (ux ? ` (UX 일정 ${row[uxCol]})` : "") };
+    if (uxCol && !ux) return { risk: true, reason: "UX 일정 미정 — 개발 일정을 산출할 수 없음" };
+    return { risk: true, reason: "개발 일정 미정" + (ux ? ` (UX 일정 ${row[uxCol]})` : "") + " — DVR 준수를 확인할 수 없음" };
+  },
+
+  riskBadge2(f) {
+    const r = this.scheduleRisk(f);
+    if (r.risk === null) return `<span class="badge b-outline" title="${r.reason}">—</span>`;
+    return r.risk
+      ? `<span class="badge b-risk-high" title="${r.reason}">있음</span>`
+      : `<span class="badge b-risk-normal" title="${r.reason}">없음</span>`;
   },
 
   // ── 관리 열 선택 창 (업로드 직후 · 설정에서 공용) ──

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-"""등급 하드룰 — AI보다 먼저 적용된다.
+"""등급 하드룰.
 
-순서: ① 자료 보완 필요(DOC) → ② 단순 공유(SHARE) → ③ 나머지만 AI가 P0/P1/P2 판정.
-여기서 걸린 건은 AI 페르소나를 호출하지 않는다(판정이 확정이므로 토큰도 아낀다).
+판정 순서:
+  ① 자료 보완 필요(DOC) — 변경점이 템플릿을 못 채우면. AI를 부르기 전에 거른다(판단 불가 + 토큰 절약).
+  ② AI 종합 에이전트가 P0/P1/P2 판정
+  ③ P2 중 단순 공유(SHARE) — 하드룰로 서면보고에서 공유로 내린다.
+
 규칙은 config/grade_rules.json — 회사에서 실제 엑셀을 보고 채운다.
 """
 from . import store
@@ -50,31 +53,34 @@ def _match(row, rule):
     return False
 
 
-def hard_grade(row):
-    """하드룰로 확정되는 등급을 돌려준다. 해당 없으면 None (→ AI가 P0/P1/P2 판정).
-    반환: (등급, 사유) 또는 (None, None)"""
-    r = rules()
+def doc_check(row):
+    """① AI 앞단 — 변경점이 부실해 판정 자체가 불가능한가. (사유) 또는 None"""
+    d = (rules().get("doc_fix") or {})
+    if not d.get("enabled"):
+        return None
     sc = store.load(store.path("config", "excel_schema.json"), {})
+    col = d.get("column") or (sc.get("fields") or {}).get("change_summary")
+    if not col:
+        return None
+    v = _val(row, col)
+    if not v:
+        return "'%s' 미기입" % col
+    if _is_blank(v):
+        return "'%s'이 자리채움 값('%s')" % (col, v)
+    if len(v) < int(d.get("min_length") or 0):
+        return "'%s'이 %d자로 너무 짧음 (최소 %d자)" % (col, len(v), d["min_length"])
+    missing = [k for k in (d.get("require_all") or []) if k not in v]
+    if missing:
+        return "'%s'에 %s 항목이 없음 (변경점 템플릿 미준수)" % (col, "·".join(missing))
+    return None
 
-    # ① 자료 보완 필요 — 변경점이 템플릿 요건을 못 채우면 판정 불가
-    d = r.get("doc_fix") or {}
-    if d.get("enabled"):
-        col = d.get("column") or (sc.get("fields") or {}).get("change_summary")
-        if col:
-            v = _val(row, col)
-            if _is_blank(v):
-                return "DOC", "'%s' 미기입" % col if not v else "'%s'이 자리채움 값('%s')" % (col, v)
-            if len(v) < int(d.get("min_length") or 0):
-                return "DOC", "'%s'이 %d자로 너무 짧음 (최소 %d자)" % (col, len(v), d["min_length"])
-            missing = [k for k in (d.get("require_all") or []) if k not in v]
-            if missing:
-                return "DOC", "'%s'에 %s 항목이 없음 (변경점 템플릿 미준수)" % (col, "·".join(missing))
 
-    # ② 단순 공유 — 논의도 결정도 필요 없는 건
-    s = r.get("share") or {}
-    if s.get("enabled"):
-        for rule in s.get("rules", []):
-            if rule.get("enabled") and _match(row, rule):
-                return "SHARE", rule.get("name") or "단순 공유 규칙 일치"
-
-    return None, None
+def share_check(row):
+    """③ P2 판정 이후 — 서면보고(P2) 중 단순 공유로 내릴 건인가. (사유) 또는 None"""
+    s = (rules().get("share") or {})
+    if not s.get("enabled"):
+        return None
+    for rule in s.get("rules", []):
+        if rule.get("enabled") and _match(row, rule):
+            return rule.get("name") or "단순 공유 규칙 일치"
+    return None
