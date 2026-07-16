@@ -65,7 +65,7 @@ App.register("meetings", {
       </div>
 
       <div class="card" style="margin-bottom:14px"><div class="card-head">회의일 지정
-        <span class="sub">회의는 하루 한 번 — 달력에서 날짜를 클릭해 회의일을 지정/해제합니다</span></div>
+        <span class="sub">회의는 하루 한 번 — 회의의 추가·삭제는 여기서만 합니다 (달력에서 날짜 클릭)</span></div>
         <div class="card-body">
           <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:start; gap:18px">
             <div>
@@ -93,9 +93,17 @@ App.register("meetings", {
       </div>
 
       <div class="card" style="margin-bottom:14px"><div class="card-head">안건 배정
-        <span class="sub">안건을 끌어다 다른 회의일로 옮기세요 · 항목 클릭 = 소요시간·예상 판정 · ★=후속 보고</span>
+        <span class="sub">안건을 끌어다 다른 회의일·미배정으로 옮기세요 (회의일 자체는 위에서 관리) · 항목 클릭 = 소요시간·예상 판정 · ★=후속 보고</span>
         <span class="count" id="slot-sum" style="margin-left:auto;font-size:11.5px;color:var(--text-3)"></span></div>
-        <div class="card-body"><div class="board" id="board"></div></div>
+        <div class="card-body">
+          <div id="board-nav" style="display:none;align-items:center;gap:8px;margin-bottom:10px">
+            <button class="btn ghost small" id="b-prev">◀</button>
+            <span id="b-range" style="font-size:12px;color:var(--text-2);min-width:150px;text-align:center"></span>
+            <button class="btn ghost small" id="b-next">▶</button>
+            <span style="font-size:11px;color:var(--text-3)">회의일이 3일을 넘어 나눠서 표시합니다 — 드래그는 보이는 회의일끼리 가능</span>
+          </div>
+          <div class="board" id="board"></div>
+        </div>
       </div>
       <div class="card"><div class="card-head">회의록 <span class="sub">붙여넣기 → AI 추출 → 사람 확인 후 확정</span></div>
         <div class="card-body" id="meetings-box"></div>
@@ -196,9 +204,15 @@ App.register("meetings", {
       });
     };
 
-    // ── 보드: 회의일을 나란히 놓고 안건을 드래그로 옮긴다 ──
+    // ── 보드: 회의일(최대 3일)을 나란히 놓고 안건을 드래그로 옮긴다 ──
+    // 회의일 추가·삭제는 위 "회의일 지정"에서만 — 여기선 안건만 옮긴다(실수로 회의가 삭제되지 않게).
+    const PAGE = 3;
+    const pages = Math.max(Math.ceil(dates.length / PAGE), 1);
+    let page = Math.min(app._meetPage || 0, pages - 1);
+
     const drawBoard = () => {
       const un = sched.unassigned || [];
+      const shown = dates.slice(page * PAGE, page * PAGE + PAGE);
       const card = (i, fi) => {
         const f = fmap[fi] || { name: fi };
         const est = i ? i.est_min : 5;
@@ -208,13 +222,12 @@ App.register("meetings", {
           ${i && i.predicted ? app.recBadge(i.predicted.predicted_decision) : ""}
           <span class="mn">${est}분</span></div>`;
       };
-      const cols = dates.map(ds => {
+      const cols = shown.map(ds => {
         const s = byDate[ds], used = s.items.reduce((a, i) => a + i.est_min, 0);
         const pct = Math.min(Math.round(used / s.capacity_min * 100), 100);
         const dw = DOW[new Date(ds + "T00:00:00").getDay()];
         return `<div class="bcol ${used > s.capacity_min ? "over-cap" : ""}" data-drop="${ds}">
-          <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span>
-            ${readonly ? "" : `<button class="btn ghost small x" data-rm2="${ds}" title="회의일 해제" style="padding:0 4px">✕</button>`}</div>
+          <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span></div>
           <div class="cap"><span>${s.items.length}건</span><span style="${used > s.capacity_min ? "color:var(--crit);font-weight:700" : ""}">${used}/${s.capacity_min}분</span></div>
           <div class="meter ${used > s.capacity_min ? "over" : pct > 85 ? "warn" : ""}"><i style="width:${pct}%"></i></div>
           ${s.items.map(i => card(i, i.feature_index)).join("") || '<div class="empty-drop">여기로 안건을 끌어오세요</div>'}
@@ -226,12 +239,22 @@ App.register("meetings", {
           <div class="cap"><span style="color:var(--text-3);font-size:10.5px">회의일에서 빼면 여기로</span></div>
           ${un.map(fi => card(null, fi)).join("") || '<div class="empty-drop">없음</div>'}
         </div>` +
-        (dates.length ? "" : '<div class="empty" style="flex:1">위 달력에서 회의일을 지정하면 여기에 나타납니다</div>');
+        (dates.length ? "" : '<div class="empty" style="flex:1">위 "회의일 지정"에서 날짜를 클릭하면 여기에 나타납니다</div>');
+      // 회의일이 3일을 넘을 때만 페이지 이동
+      const nav = el.querySelector("#board-nav");
+      nav.style.display = pages > 1 ? "flex" : "none";
+      if (pages > 1) {
+        el.querySelector("#b-range").textContent = `${shown[0]?.slice(5)} ~ ${shown[shown.length - 1]?.slice(5)} (${page + 1}/${pages})`;
+        el.querySelector("#b-prev").disabled = page === 0;
+        el.querySelector("#b-next").disabled = page >= pages - 1;
+      }
       bindBoard();
     };
 
+    el.querySelector("#b-prev").onclick = () => { page = Math.max(page - 1, 0); app._meetPage = page; drawBoard(); };
+    el.querySelector("#b-next").onclick = () => { page = Math.min(page + 1, pages - 1); app._meetPage = page; drawBoard(); };
+
     const bindBoard = () => {
-      el.querySelectorAll("[data-rm2]").forEach(b => b.onclick = e => { e.stopPropagation(); toggleDay(b.dataset.rm2); });
       el.querySelectorAll(".bitem").forEach(it => {
         it.onclick = () => openItem(it.dataset.idx);
         it.ondragstart = e => {
