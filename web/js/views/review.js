@@ -132,6 +132,17 @@ App.register("review", {
           ${f.reregistered_from ? `<dt>재등록</dt><dd><span class="badge b-violet">${f.reregistered_from}에서 미지원/보류 → 재등록</span></dd>` : ""}
           ${f.decision ? `<dt>회의 결정</dt><dd>${app.recBadge(f.decision)}${f.decision === "reject" ? ' <span style="font-size:11.5px;color:var(--text-2)">이번 버전 제외 · 다음 버전 이력 추적용</span>' : ""}</dd>` : ""}
         </div>
+        ${(() => {
+          // AI 관련 Feature일 때만 (ai_category가 hide_values에 없으면) AI 상세 열을 추가로 보여준다
+          const ad = app.state.boot.ai_detail || {};
+          if (ad.enabled === false || !(ad.columns || []).length) return "";
+          const cat = String(f.ai_category == null ? "" : f.ai_category).trim();
+          if ((ad.hide_values || []).map(String).includes(cat)) return "";
+          return `<div class="section-label">AI 상세 <span style="font-weight:400;text-transform:none">— AI 관련 Feature에만 표시</span></div>
+            <div class="kv">
+              ${ad.columns.map(c => `<dt title="AI 상세 열">${c}</dt><dd style="font-size:12px">${f.row[c] || '<span style="color:var(--text-3)">미기재</span>'}</dd>`).join("")}
+            </div>`;
+        })()}
         <div class="section-label">등급</div>
         ${syn.final_grade ? `
           <div class="pscore"><div class="ph"><span>${app.gradeBadge(syn.final_grade)}

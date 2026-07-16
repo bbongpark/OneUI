@@ -179,7 +179,7 @@
 
 | 파일 | 구조 요약 |
 |---|---|
-| `features.json` | `{version, readonly, features:[{feature_index, name(AI제목), row{엑셀전체}, function_name, ai_category, decision, status, reregistered_from, input_changed, slides[]}]}` |
+| `features.json` | `{version, readonly, features:[{feature_index, name(AI제목), row{엑셀전체 — 관리열 밖 CL·AI상세 열도 여기 다 있다}, function_name, ai_category, decision, status, reregistered_from, input_changed, slides[]}]}` |
 | `reviews.json` | `{rev, items:{<idx>:{personas{experience_planning,ux,dev,cxi}, synthesis{final_grade,status,rationale,divergent,divergent_summary,meeting_questions,ai_grade}, hard_rule, share_rule, override, history[]}}}}` |
 | `pl_checks.json` | `{rev, items:{<idx>:{ready, doc_issues[], slide_issues[{slide,issue}]}}}` |
 | `schedule.json` | `{rev, dvr, milestones[], slots:[{date, time, capacity_min, items:[{feature_index, est_min, followup, predicted{...}}]}], unassigned[]}` |
@@ -236,6 +236,7 @@
 - **필터 분리**: 상태 필터 → **단계**(f.status, 하나) + **조건**(겹침). 드릴다운은 `stage:`/`cond:` 접두사.
 - **SW담당 예상**: `job_predict`가 **PL ready 안건만** 예측(자료 없으면 예측 근거 없음). 재실행 시 stale 예측 비움. 리뷰 보드 상세 모달 맨 아래에 예상+근거 표시.
 - **적중률 카드**: 큰 숫자 = 최근 5개 회의 **안건 수 가중 종합**(단순 평균 아님, detail.match 합산).
+- **AI 상세 조건부 표시**: 리뷰 보드 상세 모달에서 `ai_category`가 `config/excel_schema.json`의 `ai_detail.hide_values`(X·AI 없음 등)에 없으면 `ai_detail.columns`를 추가 섹션으로 표시. 열 이름·트리거 값 모두 config(하드코딩 금지). managed_columns와 별개 — 상세 표시 전용이라 AI 입력엔 안 들어가고 원본 행에서 직접 읽는다.
 
 ---
 

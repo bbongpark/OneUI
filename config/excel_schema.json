@@ -38,5 +38,11 @@
     "기능명",
     "AI카테고리",
     "변경점"
-  ]
+  ],
+  "_ai_detail_comment": "AI 관련 Feature일 때만 리뷰 보드 상세에 추가로 보여줄 열. 트리거는 논리필드 ai_category(AI Category) 값 — hide_values 중 하나면(예: X, AI 없음) 숨기고, 그 외면 columns를 표시한다. columns는 회사 실제 엑셀 열 이름으로 교체할 것(관리 열이 아니어도 원본 행에서 직접 읽는다). managed_columns와 별개 — 상세 표시 전용이라 AI 입력에는 넣지 않는다.",
+  "ai_detail": {
+    "enabled": true,
+    "hide_values": ["X", "AI 없음", "-", ""],
+    "columns": ["신규/고도화", "권역", "지원언어", "AI카테고리", "유료화", "요소기술", "KPI", "일반인베타 오픈여부"]
+  }
 }

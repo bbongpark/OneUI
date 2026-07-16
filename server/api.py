@@ -164,6 +164,7 @@ def api_bootstrap():
     return {"versions": store.versions(), "users": users,
             "managed_columns": sc.get("managed_columns", []),
             "dev_done_rule": sc.get("dev_done_rule", {}),
+            "ai_detail": sc.get("ai_detail", {}),
             "schema_fields": sc.get("fields", {}),
             "engine": {"default": eng.get("default_engine"), "names": list((eng.get("engines") or {}).keys())}}
 

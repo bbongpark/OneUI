@@ -85,6 +85,17 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             "변경점": change,
             "VOC건수": random.choice(["", str(random.randint(20, 4200))]),
         }
+        # AI 상세 열 — AI 관련 Feature에만 값이 있다(비AI는 빈칸). config/excel_schema.json의 ai_detail로 상세에 표시.
+        is_ai = cat != "AI 없음"
+        row.update({
+            "신규/고도화": random.choice(["신규", "고도화"]) if is_ai else "",
+            "권역": random.choice(["글로벌", "국내", "북미", "유럽", "글로벌(중국 제외)"]) if is_ai else "",
+            "지원언어": random.choice(["한국어", "한/영", "한/영/중/일", "전 언어(16종)"]) if is_ai else "",
+            "유료화": random.choice(["무료", "구독형", "부분 유료"]) if is_ai else "",
+            "요소기술": random.choice(["온디바이스 LLM", "클라우드 LLM", "STT", "이미지 생성", "추천 엔진"]) if is_ai else "",
+            "KPI": random.choice(["MAU +5%", "VOC 30% 감소", "체류시간 +8%", "미설정"]) if is_ai else "",
+            "일반인베타 오픈여부": random.choice(["오픈", "미오픈", "검토중"]) if is_ai else "",
+        })
         st_reviewed = i <= int(n * reviewed_ratio)
         st_decided = i <= int(n * decided_ratio)
         status = "meeting_wait" if st_reviewed else ("reviewing" if i <= int(n * reviewed_ratio) + 6 else "ingested")
