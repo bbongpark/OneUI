@@ -101,8 +101,8 @@ def ingest_excel(version, xlsx_path):
                   " · 갱신본에 없음 %d" % len(removed) if removed else ""))
     return {"kind": "xlsx", "total": len(feats), "new": n_new, "changed": n_changed,
             "kept": n_kept, "reregistered": rereg, "missing": removed[:20],
-            "columns": len(rows[0]), "new_columns": new_cols[:30],
-            "managed_columns_set": bool(sc.get("managed_columns"))}
+            "columns": len(rows[0]), "all_columns": list(rows[0].keys()), "new_columns": new_cols,
+            "managed_columns": sc.get("managed_columns", [])}
 
 
 def ingest_ppt(version, pptx_path):

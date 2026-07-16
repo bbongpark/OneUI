@@ -16,6 +16,7 @@ const App = {
     this.state.boot = await this.api("/api/bootstrap");
     const qp = new URLSearchParams(location.search);
     if (qp.get("theme")) { document.documentElement.dataset.theme = qp.get("theme"); }
+    if (qp.get("autoclick")) setTimeout(() => document.getElementById(qp.get("autoclick"))?.click(), 1800);
     if (qp.get("as")) {   // 테스트/헤드리스 캡처용 자동 로그인
       this.state.user = await this.api("/api/login", { name: qp.get("as") });
       localStorage.setItem("user", JSON.stringify(this.state.user));
@@ -161,6 +162,72 @@ const App = {
   statusBadge(s) {
     const m = { ingested: ["b-p2", "인입"], reviewing: ["b-blue", "리뷰 중"], meeting_wait: ["b-violet", "회의 대기"], decided: ["b-go", "결정됨"] };
     return m[s] ? `<span class="badge ${m[s][0]}">${m[s][1]}</span>` : "";
+  },
+
+  // ── 관리 열 선택 창 (업로드 직후 · 설정에서 공용) ──
+  // cols: 엑셀의 전체 열, managed: 현재 선택된 열, newCols: 이번에 새로 감지된 열
+  columnPicker({ cols, managed, newCols = [], onSaved }) {
+    const sel = new Set(managed && managed.length ? managed : cols);   // 최초엔 전체 선택
+    const body = App.el(`
+      <p style="font-size:12.5px;color:var(--text-2);margin-bottom:10px">
+        엑셀의 <b>${cols.length}개 열</b> 중 <b>관리할 열</b>을 고르세요. 선택한 열만 AI 페르소나가 참고하고,
+        리뷰 보드 상세와 스키마 매핑 표에 나타납니다. 나머지 열의 값은 저장되지만 사용되지 않습니다.
+        ${newCols.length ? `<br><span style="color:var(--serious)">이번 업로드에서 새 열 ${newCols.length}개가 감지되었습니다 (아래 <b>NEW</b> 표시).</span>` : ""}
+      </p>
+      <div class="filterbar" style="margin-bottom:8px">
+        <input type="search" id="cp-q" placeholder="열 이름 검색…" style="min-width:180px">
+        <button class="btn small" id="cp-all">보이는 항목 전체</button>
+        <button class="btn small" id="cp-none">보이는 항목 해제</button>
+        ${newCols.length ? `<button class="btn small" id="cp-new">새 열만 선택</button>` : ""}
+        <span class="count" id="cp-count"></span>
+      </div>
+      <div style="max-height:46vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:8px 10px">
+        ${cols.map(c => `
+          <label data-cp-row="${c}" style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px dashed var(--border);font-size:12.5px;cursor:pointer">
+            <input type="checkbox" data-cp="${c}" ${sel.has(c) ? "checked" : ""} style="width:auto">
+            <span style="flex:1">${c}</span>
+            ${newCols.includes(c) ? '<span class="badge b-blue">NEW</span>' : ""}
+          </label>`).join("")}
+      </div>`);
+    const count = () => {
+      const n = body.querySelectorAll("[data-cp]:checked").length;
+      body.querySelector("#cp-count").textContent = `${n} / ${cols.length}열 선택`;
+    };
+    const visible = () => [...body.querySelectorAll("[data-cp-row]")].filter(r => r.style.display !== "none");
+    body.querySelector("#cp-q").oninput = e => {
+      const q = e.target.value.toLowerCase();
+      body.querySelectorAll("[data-cp-row]").forEach(r =>
+        r.style.display = r.dataset.cpRow.toLowerCase().includes(q) ? "" : "none");
+    };
+    body.querySelector("#cp-all").onclick = () => { visible().forEach(r => r.querySelector("input").checked = true); count(); };
+    body.querySelector("#cp-none").onclick = () => { visible().forEach(r => r.querySelector("input").checked = false); count(); };
+    const nb = body.querySelector("#cp-new");
+    if (nb) nb.onclick = () => {
+      body.querySelectorAll("[data-cp]").forEach(c => c.checked = newCols.includes(c.dataset.cp));
+      count();
+    };
+    body.querySelectorAll("[data-cp]").forEach(c => c.onchange = count);
+    count();
+    const ok = document.createElement("button");
+    ok.className = "btn primary";
+    ok.textContent = "관리 열 저장";
+    ok.onclick = async () => {
+      const picked = [...body.querySelectorAll("[data-cp]:checked")].map(c => c.dataset.cp);
+      if (!picked.length) return this.toast("최소 1개 열을 선택하세요", true);
+      try {
+        const schema = await this.api("/api/config/excel_schema");
+        await this.api("/api/config/excel_schema", {
+          user: this.state.user.name, role: this.state.user.role,
+          data: { ...schema, managed_columns: picked }
+        });
+        this.state.boot = await this.api("/api/bootstrap");
+        this.toast(`관리 열 ${picked.length}개 저장됨`);
+        back.remove();
+        if (onSaved) onSaved(picked);
+      } catch (e) { this.toast(e.message, true); }
+    };
+    const back = this.modal({ title: "관리 열 선택", body, foot: [ok], wide: true });
+    return back;
   },
 
   // ── 슬라이드 뷰어 ──

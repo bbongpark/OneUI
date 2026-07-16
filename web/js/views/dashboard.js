@@ -138,10 +138,20 @@ App.register("dashboard", {
           const r = await app.api("/api/ingest/upload", { filename: file.name, b64, version: ver,
             user: app.state.user.name, role: app.state.user.role });
           res.lastElementChild.outerHTML = r.kind === "xlsx"
-            ? `<div class="info-banner">📄 ${file.name} — 전체 ${r.total} · 신규 ${r.new} · 변경 ${r.changed} · 캐시 유지 ${r.kept}${r.reregistered ? ` · <b>재등록 ${r.reregistered}</b>` : ""}${r.missing.length ? ` · 갱신본에 없음 ${r.missing.length}건` : ""}</div>` +
-              (r.new_columns && r.new_columns.length ? `<div class="warn-banner">🗂 새 열 ${r.new_columns.length}개 감지 (전체 ${r.columns}개)${r.managed_columns_set ? " — 관리 열에 포함할지 확인하세요" : " — 관리 열을 선택하면 AI가 그 열만 참고합니다"}: ${r.new_columns.slice(0, 8).join(", ")}${r.new_columns.length > 8 ? " …" : ""} <a href="#/settings" style="font-weight:700">→ 설정에서 선택</a></div>` : "")
+            ? `<div class="info-banner">📄 ${file.name} — 전체 ${r.total} · 신규 ${r.new} · 변경 ${r.changed} · 캐시 유지 ${r.kept}${r.reregistered ? ` · <b>재등록 ${r.reregistered}</b>` : ""}${r.missing.length ? ` · 갱신본에 없음 ${r.missing.length}건` : ""}</div>`
             : `<div class="info-banner">🖼 ${file.name} — Feature ${r.mapped_features}건에 슬라이드 ${r.mapped_slides}장 매핑${r.unmapped ? ` · 미매핑 ${r.unmapped}` : ""} · <a href="#/review" style="font-weight:700">매핑 확인 필요 →</a></div>`;
           app.state.boot = await app.api("/api/bootstrap");
+          // 엑셀이면 관리 열 선택 창을 바로 띄운다 (새 열이 없고 이미 선택돼 있으면 생략)
+          if (r.kind === "xlsx" && r.all_columns &&
+              (r.new_columns.length || !r.managed_columns.length)) {
+            setTimeout(() => app.columnPicker({
+              cols: r.all_columns, managed: r.managed_columns, newCols: r.new_columns,
+              onSaved: () => {
+                res.insertAdjacentHTML("beforeend",
+                  `<div class="info-banner">✅ 관리 열 저장됨 — <a href="#/settings" style="font-weight:700">설정에서 논리 필드·필수·트리거 지정 →</a></div>`);
+              }
+            }), 400);
+          }
           if (!app.state.boot.versions.includes(app.state.version) || ver !== app.state.version) {
             const vs = document.getElementById("version-select");
             vs.innerHTML = app.state.boot.versions.map(v => `<option value="${v}">One UI ${v}</option>`).join("");
