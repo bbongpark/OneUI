@@ -226,6 +226,7 @@ def api_override(b):
 
 
 def api_schedule_move(b):
+    """안건을 슬롯 간 이동 / 미배정으로 빼기 / 미배정에서 슬롯으로 되돌리기 (드래그앤드롭)."""
     v = b["version"]
     def fn(obj):
         item = None
@@ -234,6 +235,12 @@ def api_schedule_move(b):
                 if i["feature_index"] == b["feature_index"]:
                     item = i
                     s["items"].remove(i)
+        if item is None:                       # 미배정 목록에서 꺼내오는 경우
+            un = obj.setdefault("unassigned", [])
+            if b["feature_index"] in un:
+                un.remove(b["feature_index"])
+                item = {"feature_index": b["feature_index"],
+                        "est_min": int(b.get("est_min") or 5), "followup": False, "predicted": None}
         if item is None:
             raise RuntimeError("해당 안건을 찾을 수 없음")
         if b.get("cancel"):
@@ -270,19 +277,24 @@ def api_schedule_plan(b):
 
 
 def api_schedule_slot(b):
-    """슬롯 수동 추가/삭제. 회의 시간이 매번 달라 슬롯은 사람이 직접 관리한다.
-    삭제 시 담긴 안건은 미배정 목록으로 이동."""
+    """회의일(슬롯) 지정/해제/시각 변경. 회의는 하루 한 번 — 날짜당 슬롯은 하나만 둔다.
+    해제 시 담긴 안건은 미배정 목록으로 이동."""
     v, op = b["version"], b["op"]
     def fn(obj):
         obj.setdefault("slots", [])
         if op == "add":
             if not b.get("date") or not b.get("time"):
                 raise RuntimeError("날짜와 시각을 입력하세요")
-            if any(s["date"] == b["date"] and s["time"] == b["time"] for s in obj["slots"]):
-                raise RuntimeError("같은 날짜·시각의 슬롯이 이미 있습니다")
+            if any(s["date"] == b["date"] for s in obj["slots"]):
+                raise RuntimeError("이미 회의일로 지정된 날짜입니다 (회의는 하루 한 번)")
             obj["slots"].append({"date": b["date"], "time": b["time"], "items": [],
                                  "capacity_min": int(b.get("capacity_min") or 60)})
             obj["slots"].sort(key=lambda s: (s["date"], s["time"]))
+        elif op == "time":
+            s = next((x for x in obj["slots"] if x["date"] == b["date"]), None)
+            if s is None:
+                raise RuntimeError("회의일을 찾을 수 없음")
+            s["time"] = b["new_time"]
         elif op == "del":
             s = next((x for x in obj["slots"] if x["date"] == b["date"] and x["time"] == b["time"]), None)
             if s is None:

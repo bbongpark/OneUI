@@ -11,9 +11,9 @@ App.register("meetings", {
     el.innerHTML = `
       <div class="page-head">
         <div><div class="page-title">회의 현황</div>
-        <div class="page-sub">슬롯 생성(수동) → 소요시간 추정 배정 → SW담당 예상 판정 → 회의록 확정</div></div>
+        <div class="page-sub">회의일 지정 → 소요시간 추정 배정 → 드래그로 조정 → SW담당 예상 판정 → 회의록 확정</div></div>
         <div class="actions">
-          <button class="btn primary" id="assign" title="만들어둔 슬롯들에 안건을 배정">④ 일정 배정 실행</button>
+          <button class="btn primary" id="assign" title="지정한 회의일에 안건을 자동 배정 (드래그로 다시 조정 가능)">④ 일정 배정 실행</button>
           <button class="btn" data-run="predict">④-2 예상 판정</button>
         </div>
       </div>
@@ -64,17 +64,10 @@ App.register("meetings", {
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:14px"><div class="card-head">회의 슬롯
-        <span class="sub">회의 시간은 매번 다름 — 슬롯을 직접 추가/삭제 · 날짜를 클릭하면 그 날의 안건이 열립니다 · ★=후속 보고</span></div>
+      <div class="card" style="margin-bottom:14px"><div class="card-head">회의일 지정
+        <span class="sub">회의는 하루 한 번 — 달력에서 날짜를 클릭해 회의일을 지정/해제합니다</span></div>
         <div class="card-body">
-          ${readonly ? "" : `<div class="filterbar" style="margin-bottom:12px">
-            <input type="date" id="s-date">
-            <input type="time" id="s-time" value="10:00" step="600">
-            <select id="s-cap"><option value="60">60분</option><option value="90">90분</option><option value="120">120분</option><option value="30">30분</option></select>
-            <button class="btn" id="s-add">+ 슬롯 추가</button>
-            <span class="count" id="slot-sum"></span>
-          </div>`}
-          <div class="grid" style="grid-template-columns: 1.15fr 1fr; align-items:start">
+          <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:start; gap:18px">
             <div>
               <div class="cal-head">
                 <button class="btn ghost small" id="cal-prev">◀</button>
@@ -82,36 +75,51 @@ App.register("meetings", {
                 <button class="btn ghost small" id="cal-next">▶</button>
                 <button class="btn ghost small" id="cal-today">오늘</button>
                 <span style="margin-left:auto;font-size:11px;color:var(--text-3)">
-                  <span class="badge b-blue">슬롯</span> <span class="badge b-nogo">DVR</span> <span class="badge b-violet">마일스톤</span></span>
+                  <span class="badge b-blue">회의일</span> <span class="badge b-nogo">DVR</span> <span class="badge b-violet">마일스톤</span></span>
               </div>
               <div class="cal" id="cal"></div>
             </div>
-            <div id="day-panel"></div>
+            <div>
+              ${readonly ? "" : `<div class="filterbar" style="margin-bottom:10px">
+                <label style="font-size:12px;color:var(--text-2)">회의 시각 <input type="time" id="s-time" value="14:00" step="600" style="width:110px"></label>
+                <label style="font-size:12px;color:var(--text-2)">길이
+                  <select id="s-cap"><option value="60">60분</option><option value="90">90분</option><option value="120">120분</option><option value="30">30분</option></select></label>
+                <span style="font-size:11px;color:var(--text-3)">← 날짜를 새로 지정할 때 적용</span>
+              </div>`}
+              <div id="picked"></div>
+            </div>
           </div>
-          ${(sched.unassigned || []).length ? `<div class="warn-banner" style="margin-top:12px">미배정 ${sched.unassigned.length}건: ${sched.unassigned.join(", ")} — 슬롯 부족, 수동 조정 필요</div>` : ""}
         </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px"><div class="card-head">안건 배정
+        <span class="sub">안건을 끌어다 다른 회의일로 옮기세요 · 항목 클릭 = 소요시간·예상 판정 · ★=후속 보고</span>
+        <span class="count" id="slot-sum" style="margin-left:auto;font-size:11.5px;color:var(--text-3)"></span></div>
+        <div class="card-body"><div class="board" id="board"></div></div>
       </div>
       <div class="card"><div class="card-head">회의록 <span class="sub">붙여넣기 → AI 추출 → 사람 확인 후 확정</span></div>
         <div class="card-body" id="meetings-box"></div>
       </div>`;
 
-    // ── 달력 + 날짜별 슬롯 패널 ──
-    const slots = sched.slots || [];
+    // ── 달력(회의일 지정) + 보드(안건 드래그 배정) ──
+    // 회의는 하루 한 번 → 슬롯 = 날짜. 날짜당 슬롯이 하나만 있도록 관리한다.
+    const slots = (sched.slots || []).slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     const byDate = {};
-    slots.forEach(s => (byDate[s.date] = byDate[s.date] || []).push(s));
+    slots.forEach(s => { if (!byDate[s.date]) byDate[s.date] = s; });
     const msByDate = {};
     (sched.milestones || []).forEach(m => (msByDate[m.date] = msByDate[m.date] || []).push(m.name));
     const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    const DOW = ["일", "월", "화", "수", "목", "금", "토"];
     const dates = Object.keys(byDate).sort();
-    // 슬롯이 있는 첫 달을 기본으로, 선택은 첫 슬롯 날짜
-    let sel = app._meetSel && byDate[app._meetSel] ? app._meetSel : dates[0] || iso(new Date());
-    let calMon = new Date(sel + "T00:00:00");     // 달력에 표시 중인 달 (openItem의 cur과 혼동 금지)
+    const today = iso(new Date());
+    let calMon = new Date((dates[0] || today) + "T00:00:00");
     calMon.setDate(1);
 
     const totalMin = slots.reduce((a, s) => a + s.items.reduce((x, i) => x + i.est_min, 0), 0);
     const totalItems = slots.reduce((a, s) => a + s.items.length, 0);
     const sum = el.querySelector("#slot-sum");
-    if (sum) sum.textContent = `슬롯 ${slots.length}개 · 안건 ${totalItems}건 · ${totalMin}분`;
+    if (sum) sum.textContent = `회의일 ${dates.length}일 · 배정 ${totalItems}건 · ${totalMin}분` +
+      ((sched.unassigned || []).length ? ` · 미배정 ${sched.unassigned.length}건` : "");
 
     el.querySelector("#cal-prev").onclick = () => { calMon.setMonth(calMon.getMonth() - 1); drawCal(); };
     el.querySelector("#cal-next").onclick = () => { calMon.setMonth(calMon.getMonth() + 1); drawCal(); };
@@ -121,87 +129,146 @@ App.register("meetings", {
       el.querySelector("#cal-mon").textContent = `${calMon.getFullYear()}년 ${calMon.getMonth() + 1}월`;
       const first = new Date(calMon.getFullYear(), calMon.getMonth(), 1);
       const last = new Date(calMon.getFullYear(), calMon.getMonth() + 1, 0);
-      const cells = [];
-      ["일", "월", "화", "수", "목", "금", "토"].forEach((w, i) =>
-        cells.push(`<div class="dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</div>`));
+      const cells = DOW.map((w, i) => `<div class="dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</div>`);
       for (let i = 0; i < first.getDay(); i++) cells.push('<div class="day pad"></div>');
       for (let dnum = 1; dnum <= last.getDate(); dnum++) {
         const ds = iso(new Date(calMon.getFullYear(), calMon.getMonth(), dnum));
-        const ss = byDate[ds] || [];
-        const isDvr = sched.dvr === ds;
-        const ms = msByDate[ds] || [];
-        const over = ss.some(s => s.items.reduce((a, i) => a + i.est_min, 0) > s.capacity_min);
-        cells.push(`<div class="day ${ss.length ? "has" : ""} ${sel === ds && ss.length ? "sel" : ""}" ${ss.length ? `data-day="${ds}"` : ""}>
+        const s = byDate[ds];
+        const over = s && s.items.reduce((a, i) => a + i.est_min, 0) > s.capacity_min;
+        cells.push(`<div class="day ${s ? "has" : ""} ${ds < today ? "past" : ""}" ${readonly ? "" : `data-day="${ds}"`}
+          title="${s ? "클릭: 회의일 해제" : "클릭: 회의일로 지정"}">
           <span class="d">${dnum}</span>
-          ${ss.length ? `<span class="pill ${over ? "over" : ""}">${ss.length}개 · ${ss.reduce((a, s) => a + s.items.length, 0)}건</span>` : ""}
-          ${isDvr ? '<span class="dvr">DVR</span>' : ""}
-          ${ms.map(n => `<span class="ms" title="${n}">◆ ${n}</span>`).join("")}
+          ${s ? `<span class="pill ${over ? "over" : ""}">${s.time} · ${s.items.length}건</span>` : ""}
+          ${sched.dvr === ds ? '<span class="dvr">DVR</span>' : ""}
+          ${(msByDate[ds] || []).map(n => `<span class="ms" title="${n}">◆ ${n}</span>`).join("")}
         </div>`);
       }
       el.querySelector("#cal").innerHTML = cells.join("");
-      el.querySelectorAll("[data-day]").forEach(c => c.onclick = () => {
-        sel = c.dataset.day; app._meetSel = sel; drawCal(); drawDay();
-      });
+      el.querySelectorAll("[data-day]").forEach(c => c.onclick = () => toggleDay(c.dataset.day));
     };
 
-    const drawDay = () => {
-      const ss = byDate[sel] || [];
-      const panel = el.querySelector("#day-panel");
-      if (!ss.length) {
-        panel.innerHTML = `<div class="empty">${slots.length ? "달력에서 파란 날짜를 클릭하세요" : "슬롯이 없습니다 — 위에서 날짜·시각·길이를 정해 추가한 뒤 배정을 실행하세요"}</div>`;
-        return;
-      }
-      panel.innerHTML = `<div style="font-weight:700;font-size:13px;margin-bottom:8px">${sel} <span style="font-weight:400;color:var(--text-3)">· 슬롯 ${ss.length}개</span></div>
-        <div style="display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto">
-        ${ss.map(s => {
-          const used = s.items.reduce((a, i) => a + i.est_min, 0);
-          return `<div class="slot ${used > s.capacity_min ? "over" : ""}">
-            <div class="slot-head"><span>${s.time}</span><span class="cap">${used}/${s.capacity_min}분
-              ${readonly ? "" : `<button class="btn ghost small" data-del-slot="${s.date}|${s.time}" title="슬롯 삭제 (안건은 미배정으로 이동)" style="padding:0 5px">✕</button>`}</span></div>
-            ${s.items.map(i => {
-              const f = fmap[i.feature_index] || { name: i.feature_index };
-              return `<div class="slot-item" data-idx="${i.feature_index}" style="cursor:pointer" title="클릭: 이동/취소/소요시간 수정">
-                ${i.followup ? "★ " : ""}<span style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">${i.feature_index}</span>
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
-                ${i.predicted ? app.recBadge(i.predicted.predicted_decision) : ""}
-                <span class="est">${i.est_min}분</span></div>`;
-            }).join("") || '<div style="color:var(--text-3);font-size:11.5px;padding:4px">비어 있음</div>'}
-          </div>`;
-        }).join("")}</div>`;
-      bindDay();
-    };
-
-    // 슬롯 추가/삭제
-    const addBtn = el.querySelector("#s-add");
-    if (addBtn) addBtn.onclick = async () => {
-      const date = el.querySelector("#s-date").value, time = el.querySelector("#s-time").value;
-      if (!date || !time) return app.toast("날짜와 시각을 입력하세요", true);
+    // 날짜 클릭 = 회의일 지정/해제
+    const toggleDay = async ds => {
+      const s = byDate[ds];
       try {
-        await app.api("/api/schedule/slot", { version: app.state.version, op: "add", date, time,
-          capacity_min: el.querySelector("#s-cap").value, base_rev: sched.rev });
-        app.toast(`슬롯 추가됨: ${date} ${time}`);
-        app._meetSel = date;                       // 추가한 날짜를 달력에서 바로 보여준다
+        if (s) {
+          const n = s.items.length;
+          if (n && !confirm(`${ds} 회의일을 해제할까요? 배정된 ${n}건은 미배정으로 이동합니다.`)) return;
+          await app.api("/api/schedule/slot", { version: app.state.version, op: "del", date: ds, time: s.time, base_rev: sched.rev });
+          app.toast(`회의일 해제: ${ds}`);
+        } else {
+          await app.api("/api/schedule/slot", { version: app.state.version, op: "add", date: ds,
+            time: el.querySelector("#s-time").value || "14:00",
+            capacity_min: el.querySelector("#s-cap").value, base_rev: sched.rev });
+          app.toast(`회의일 지정: ${ds}`);
+        }
         await app.reload(); app.route();
-      } catch (e) { app.toast(e.message.includes("rev") ? "다른 사용자가 먼저 수정했습니다 — 새로고침됩니다" : e.message, true); if (e.message.includes("rev")) { await app.reload(); app.route(); } }
+      } catch (e) {
+        app.toast(e.message.includes("rev") ? "다른 사용자가 먼저 수정했습니다 — 새로고침합니다" : e.message, true);
+        if (e.message.includes("rev")) { await app.reload(); app.route(); }
+      }
     };
 
-    // 날짜 패널의 슬롯 삭제 · 안건 조정 — 패널을 다시 그릴 때마다 연결
-    function bindDay() {
-      el.querySelectorAll("[data-del-slot]").forEach(b => b.onclick = async e => {
-        e.stopPropagation();
-        const [date, time] = b.dataset.delSlot.split("|");
-        try {
-          await app.api("/api/schedule/slot", { version: app.state.version, op: "del", date, time, base_rev: sched.rev });
-          app.toast("슬롯 삭제됨 — 담긴 안건은 미배정으로 이동");
+    // 선택된 회의일 요약 (달력 옆)
+    const drawPicked = () => {
+      el.querySelector("#picked").innerHTML = dates.length
+        ? `<div style="font-size:12px;color:var(--text-2);margin-bottom:6px">지정된 회의일 <b>${dates.length}일</b></div>` +
+          dates.map(ds => {
+            const s = byDate[ds], used = s.items.reduce((a, i) => a + i.est_min, 0);
+            const dw = DOW[new Date(ds + "T00:00:00").getDay()];
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:12.5px">
+              <b style="font-family:var(--mono)">${ds}</b><span style="color:var(--text-3)">(${dw})</span>
+              ${readonly ? `<span>${s.time}</span>`
+                : `<input type="time" data-t="${ds}" value="${s.time}" step="600" style="width:100px;padding:3px 6px">`}
+              <span style="margin-left:auto;color:${used > s.capacity_min ? "var(--crit)" : "var(--text-2)"}">${used}/${s.capacity_min}분 · ${s.items.length}건</span>
+              ${readonly ? "" : `<button class="btn ghost small" data-rm="${ds}" title="회의일 해제" style="padding:0 5px">✕</button>`}
+            </div>`;
+          }).join("")
+        : '<div class="empty" style="padding:24px 0">달력에서 회의할 날짜를 클릭하세요 (보통 3일 정도)</div>';
+      el.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => toggleDay(b.dataset.rm));
+      el.querySelectorAll("[data-t]").forEach(inp => inp.onchange = async () => {
+        const ds = inp.dataset.t, old = byDate[ds].time;
+        try {   // 시각 변경 = 같은 날 슬롯을 새 시각으로 다시 만든다 (안건 유지)
+          await app.api("/api/schedule/slot", { version: app.state.version, op: "time",
+            date: ds, time: old, new_time: inp.value, base_rev: sched.rev });
           await app.reload(); app.route();
-        } catch (e2) { app.toast(e2.message, true); }
+        } catch (e) { app.toast(e.message, true); }
       });
-      el.querySelectorAll(".slot-item").forEach(item => item.onclick = () => openItem(item.dataset.idx));
-    }
+    };
+
+    // ── 보드: 회의일을 나란히 놓고 안건을 드래그로 옮긴다 ──
+    const drawBoard = () => {
+      const un = sched.unassigned || [];
+      const card = (i, fi) => {
+        const f = fmap[fi] || { name: fi };
+        const est = i ? i.est_min : 5;
+        return `<div class="bitem ${i && i.followup ? "fu" : ""}" draggable="${!readonly}" data-idx="${fi}"
+                     title="${f.name} — 클릭: 상세·소요시간, 드래그: 다른 회의일로 이동">
+          <span class="fi">${fi}</span><span class="nm">${f.name}</span>
+          ${i && i.predicted ? app.recBadge(i.predicted.predicted_decision) : ""}
+          <span class="mn">${est}분</span></div>`;
+      };
+      const cols = dates.map(ds => {
+        const s = byDate[ds], used = s.items.reduce((a, i) => a + i.est_min, 0);
+        const pct = Math.min(Math.round(used / s.capacity_min * 100), 100);
+        const dw = DOW[new Date(ds + "T00:00:00").getDay()];
+        return `<div class="bcol ${used > s.capacity_min ? "over-cap" : ""}" data-drop="${ds}">
+          <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span>
+            ${readonly ? "" : `<button class="btn ghost small x" data-rm2="${ds}" title="회의일 해제" style="padding:0 4px">✕</button>`}</div>
+          <div class="cap"><span>${s.items.length}건</span><span style="${used > s.capacity_min ? "color:var(--crit);font-weight:700" : ""}">${used}/${s.capacity_min}분</span></div>
+          <div class="meter ${used > s.capacity_min ? "over" : pct > 85 ? "warn" : ""}"><i style="width:${pct}%"></i></div>
+          ${s.items.map(i => card(i, i.feature_index)).join("") || '<div class="empty-drop">여기로 안건을 끌어오세요</div>'}
+        </div>`;
+      }).join("");
+      el.querySelector("#board").innerHTML = (cols || "") +
+        `<div class="bcol un" data-drop="">
+          <div class="bhead"><span class="dt">미배정</span><span class="dow">${un.length}건</span></div>
+          <div class="cap"><span style="color:var(--text-3);font-size:10.5px">회의일에서 빼면 여기로</span></div>
+          ${un.map(fi => card(null, fi)).join("") || '<div class="empty-drop">없음</div>'}
+        </div>` +
+        (dates.length ? "" : '<div class="empty" style="flex:1">위 달력에서 회의일을 지정하면 여기에 나타납니다</div>');
+      bindBoard();
+    };
+
+    const bindBoard = () => {
+      el.querySelectorAll("[data-rm2]").forEach(b => b.onclick = e => { e.stopPropagation(); toggleDay(b.dataset.rm2); });
+      el.querySelectorAll(".bitem").forEach(it => {
+        it.onclick = () => openItem(it.dataset.idx);
+        it.ondragstart = e => {
+          e.dataTransfer.setData("text/plain", it.dataset.idx);
+          e.dataTransfer.effectAllowed = "move";
+          it.classList.add("dragging");
+        };
+        it.ondragend = () => it.classList.remove("dragging");
+      });
+      el.querySelectorAll("[data-drop]").forEach(col => {
+        col.ondragover = e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; col.classList.add("drop"); };
+        col.ondragleave = () => col.classList.remove("drop");
+        col.ondrop = async e => {
+          e.preventDefault();
+          col.classList.remove("drop");
+          const idx = e.dataTransfer.getData("text/plain");
+          if (!idx) return;
+          const to = col.dataset.drop;                       // "" = 미배정 컬럼
+          const from = slots.find(s => s.items.some(i => i.feature_index === idx));
+          if ((from && from.date === to) || (!from && !to)) return;   // 제자리
+          try {
+            const r = to
+              ? await app.api("/api/schedule/move", { version: app.state.version, feature_index: idx,
+                  date: to, time: byDate[to].time })
+              : await app.api("/api/schedule/move", { version: app.state.version, feature_index: idx, cancel: true });
+            app.toast(to ? `${idx} → ${to} 이동` : `${idx} → 미배정`);
+            if (r.warning) app.toast("⚠ " + r.warning, true);
+            await app.reload(); app.route();
+          } catch (e2) { app.toast(e2.message, true); }
+        };
+      });
+    };
 
     function openItem(idx) {
       if (readonly) return;
       const cur = sched.slots.flatMap(s => s.items).find(i => i.feature_index === idx);
+      if (!cur) return app.toast(`${idx} — 미배정 상태입니다. 회의일 컬럼으로 끌어다 놓으세요`, true);
       const pred = cur.predicted;
       const body = App.el(`
         ${pred ? `<div class="pscore" style="margin-bottom:12px"><div class="ph"><span>SW담당 예상</span>
@@ -210,8 +277,9 @@ App.register("meetings", {
           ${(pred.anticipated_questions || []).map(q => `<div class="rat" style="color:var(--accent)">예상 질문: ${q}</div>`).join("")}</div>` : ""}
         <div class="kv" style="grid-template-columns:100px 1fr">
           <dt>소요시간(분)</dt><dd><input type="number" id="mv-est" value="${cur.est_min}" min="3" max="30" style="width:90px"></dd>
-          <dt>이동할 슬롯</dt><dd><select id="mv-slot"><option value="">이동 안 함</option>
-            ${sched.slots.map(s => `<option value="${s.date}|${s.time}">${s.date} ${s.time} (${s.items.reduce((a, i) => a + i.est_min, 0)}/${s.capacity_min}분)</option>`).join("")}</select></dd>
+          <dt>회의일 이동</dt><dd><select id="mv-slot"><option value="">이동 안 함</option>
+            ${sched.slots.map(s => `<option value="${s.date}|${s.time}">${s.date} ${s.time} (${s.items.reduce((a, i) => a + i.est_min, 0)}/${s.capacity_min}분)</option>`).join("")}</select>
+            <div style="font-size:11px;color:var(--text-3);margin-top:3px">보드에서 드래그로도 옮길 수 있습니다</div></dd>
         </div>`);
       const save = document.createElement("button");
       save.className = "btn primary"; save.textContent = "적용";
@@ -239,7 +307,8 @@ App.register("meetings", {
     }
 
     drawCal();
-    drawDay();
+    drawPicked();
+    drawBoard();
 
     // ── 회의록 ──
     const mbox = el.querySelector("#meetings-box");
@@ -309,7 +378,7 @@ App.register("meetings", {
     });
 
     el.querySelector("#assign").onclick = () => {
-      if (!(sched.slots || []).length) return app.toast("슬롯이 없습니다 — 먼저 \"+ 슬롯 추가\"로 회의 슬롯을 만드세요", true);
+      if (!(sched.slots || []).length) return app.toast("회의일이 없습니다 — 달력에서 날짜를 클릭해 지정하세요", true);
       app.run("schedule", {});
     };
     el.querySelectorAll("[data-run]").forEach(b => b.onclick = () => app.run(b.dataset.run));

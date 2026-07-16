@@ -254,17 +254,42 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .dropzone .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; }
 .step-num { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; margin-right: 7px; }
 
-/* 달력 — 슬롯이 있는 날을 표시하고 클릭하면 그 날의 슬롯을 연다 */
+/* 회의 보드 — 선택한 회의일을 나란히 놓고 안건을 드래그로 옮긴다 */
+.board { display: flex; gap: 10px; align-items: flex-start; overflow-x: auto; padding-bottom: 6px; }
+.bcol { flex: 1 1 0; min-width: 210px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px; transition: all .12s; }
+.bcol.un { flex: 0 0 200px; background: transparent; border-style: dashed; }
+.bcol.over-cap { border-color: var(--crit); }
+.bcol.drop { border-color: var(--accent); background: var(--accent-bg); box-shadow: 0 0 0 2px var(--accent-bg); }
+.bcol .bhead { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.bcol .bhead .dt { font-weight: 700; font-size: 13px; }
+.bcol .bhead .dow { font-size: 11px; color: var(--text-3); }
+.bcol .bhead .x { margin-left: auto; }
+.bcol .meter { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; margin-bottom: 8px; }
+.bcol .meter i { display: block; height: 100%; background: var(--good); border-radius: 3px; }
+.bcol .meter.warn i { background: var(--warn); } .bcol .meter.over i { background: var(--crit); }
+.bcol .cap { font-size: 11px; color: var(--text-2); margin-bottom: 8px; display: flex; justify-content: space-between; }
+.bitem { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; margin-bottom: 5px; font-size: 12px; cursor: grab; transition: all .1s; }
+.bitem:hover { border-color: var(--border-strong); transform: translateX(1px); }
+.bitem.dragging { opacity: .4; cursor: grabbing; }
+.bitem .fi { font-family: var(--mono); font-size: 10px; color: var(--text-3); flex: none; }
+.bitem .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bitem .mn { font-size: 10.5px; color: var(--text-3); flex: none; }
+.bitem.fu { border-left: 3px solid var(--accent); }
+.bcol .empty-drop { text-align: center; color: var(--text-3); font-size: 11.5px; padding: 14px 0; border: 1px dashed var(--border); border-radius: 8px; }
+
+/* 달력 — 날짜를 클릭해 회의일로 지정/해제한다 */
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal .dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-3); padding: 2px 0; }
 .cal .dow.sun { color: var(--crit); } .cal .dow.sat { color: var(--accent); }
 .cal .day { min-height: 62px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 6px; background: var(--surface); font-size: 11.5px; display: flex; flex-direction: column; gap: 3px; transition: all .12s; }
 .cal .day.pad { border-color: transparent; background: transparent; }
-.cal .day.has { cursor: pointer; border-color: var(--accent); background: var(--accent-bg); }
-.cal .day.has:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
-.cal .day.sel { border-color: var(--accent); border-width: 2px; background: var(--accent-bg); }
+.cal .day:not(.pad) { cursor: pointer; }
+.cal .day:not(.pad):hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.cal .day.has { border-color: var(--accent); border-width: 2px; background: var(--accent-bg); }
+.cal .day.has:hover { box-shadow: var(--shadow); }
 .cal .day .d { font-weight: 700; color: var(--text-2); }
 .cal .day.has .d { color: var(--accent); }
+.cal .day.past { opacity: .5; }
 .cal .day .pill { font-size: 10px; padding: 1px 5px; border-radius: 5px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal .day.has .pill { background: var(--surface); color: var(--accent); font-weight: 600; }
 .cal .day .pill.over { background: var(--crit-bg); color: var(--crit); }

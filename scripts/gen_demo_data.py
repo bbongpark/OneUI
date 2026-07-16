@@ -154,24 +154,25 @@ def main():
     slots = []
     day_feats = [f for f in f85 if f["status"] in ("meeting_wait", "decided")]
     random.shuffle(day_feats)
-    days = ["2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23"]
+    # 회의는 하루 한 번 — 회의일 3일을 지정해 배정한다
+    days = ["2026-07-20", "2026-07-22", "2026-07-24"]
     di = 0
     for d in days:
-        for hour in ("10:00", "14:00"):
-            take, mins = [], 0
-            while day_feats and mins < 55:
-                ft = day_feats.pop()
-                est = random.choice([3, 5, 5, 8, 12])
-                take.append({"feature_index": ft["feature_index"], "est_min": est,
-                             "followup": di % 9 == 8, "predicted": None})
-                mins += est
-                di += 1
-            slots.append({"date": d, "time": hour, "items": take, "capacity_min": 60})
+        take, mins = [], 0
+        while day_feats and mins < 55:
+            ft = day_feats.pop()
+            est = random.choice([3, 5, 5, 8, 12])
+            take.append({"feature_index": ft["feature_index"], "est_min": est,
+                         "followup": di % 9 == 8, "predicted": None})
+            mins += est
+            di += 1
+        slots.append({"date": d, "time": "14:00", "items": take, "capacity_min": 60})
+    unassigned = [f["feature_index"] for f in day_feats]   # 슬롯에 안 들어간 나머지
     json.dump({"rev": 2, "dvr": "2026-08-28", "milestones": [
         {"name": "UX 시안 확정", "date": "2026-07-31"},
         {"name": "검증 시작", "date": "2026-09-04"},
         {"name": "최종 빌드", "date": "2026-09-25"},
-    ], "period": {"from": "2026-07-20", "to": "2026-07-23"}, "slots": slots},
+    ], "slots": slots, "unassigned": unassigned},
         open(D("8.5", "schedule.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
     # 회의록/결정
