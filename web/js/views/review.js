@@ -31,7 +31,7 @@ App.register("review", {
           <option value="notready">PL 미준비</option><option value="risk">일정 리스크 있음</option>
           <option value="divergent">부문 인식 충돌</option><option value="rereg">재등록</option>
           <option value="decided">결정됨</option><option value="devdone">개발 완료</option>
-          <option value="rejected">거절 목록</option>
+          <option value="rejected">미지원 목록</option>
         </select>
         <span class="count" id="f-count"></span>
       </div>
@@ -52,8 +52,8 @@ App.register("review", {
       const fc = el.querySelector("#f-cat").value, fs = el.querySelector("#f-state").value;
       const list = feats.filter(f => {
         const it = rv[f.feature_index] || {}, syn = it.synthesis || {}, plc = pl[f.feature_index] || {};
-        if (fs !== "rejected" && f.decision === "rejected") return false;
-        if (fs === "rejected") return f.decision === "rejected";
+        if (fs !== "rejected" && f.decision === "reject") return false;
+        if (fs === "rejected") return f.decision === "reject";
         if (q && !((f.name || "").toLowerCase().includes(q) || f.feature_index.toLowerCase().includes(q) || (f.function_name || "").includes(q))) return false;
         if (fg && syn.final_grade !== fg) return false;
         if (fd && f.function_name !== fd) return false;
@@ -71,20 +71,26 @@ App.register("review", {
       rows.innerHTML = list.map(f => {
         const it = rv[f.feature_index] || {}, syn = it.synthesis || {}, plc = pl[f.feature_index] || {};
         const per = it.personas || {};
-        // 등급을 어떻게 정했는지 — 규칙 확정 / 종합 AI가 4개 부문 의견을 보고
+        // 등급을 어떻게 정했는지 — 규칙 확정 / 종합 AI가 부문 의견을 보고. 확인·충돌 표시도 여기에
         const nPer = Object.keys(per).length;
-        const why = it.hard_rule ? `<span class="badge b-doc" title="${it.hard_rule.reason}">⚙ 규칙</span>`
+        const flags = [
+          it.override ? `<span class="badge b-outline" title="사람이 수정함 (${it.override.by}: ${it.override.reason || ""})">✍ 수정</span>` : "",
+          syn.status === "needs_human" ? '<span class="badge b-blue" title="AI가 판단을 보류함 — 사람 확인 필요">확인</span>' : "",
+          syn.divergent ? `<span class="badge b-cgo" title="${syn.divergent_summary || ""}">충돌</span>` : ""
+        ].filter(Boolean).join(" ");
+        const base = it.hard_rule ? `<span class="badge b-doc" title="${it.hard_rule.reason}">⚙ 규칙</span>`
           : it.share_rule ? `<span class="badge b-share" title="${it.share_rule.reason} (AI 판정 P2)">⚙ 규칙</span>`
           : syn.final_grade ? `<span style="font-size:11.5px;color:var(--text-2)" title="${syn.rationale || ""}">부문 ${nPer}개 의견 종합</span>`
           : `<span class="badge b-outline">미실행</span>`;
+        const why = base + (flags ? " " + flags : "");
         const pred = predMap[f.feature_index];
         return `<tr class="clickable" data-idx="${f.feature_index}">
-          <td class="idx">${f.feature_index}${f.reregistered_from ? ` <span class="badge b-violet" title="이전 버전 ${f.reregistered_from}에서 거절/보류된 건의 재등록">재등록</span>` : ""}${f.input_changed ? ` <span class="badge b-blue" title="리뷰 후 입력이 변경됨 — 재확인 필요">입력변경</span>` : ""}</td>
+          <td class="idx">${f.feature_index}${f.reregistered_from ? ` <span class="badge b-violet" title="이전 버전 ${f.reregistered_from}에서 미지원/보류된 건의 재등록">재등록</span>` : ""}${f.input_changed ? ` <span class="badge b-blue" title="리뷰 후 입력이 변경됨 — 재확인 필요">입력변경</span>` : ""}</td>
           <td class="name" title="${f.name}">${f.name}</td>
           <td>${f.function_name}</td>
-          <td>${app.gradeBadge(syn.final_grade)}${it.override ? ' <span title="사람이 수정함 (' + it.override.by + ')">✍</span>' : ""}${syn.status === "needs_human" ? ' <span class="badge b-blue">확인</span>' : ""}${syn.divergent ? ' <span class="badge b-cgo" title="' + (syn.divergent_summary || "") + '">충돌</span>' : ""}</td>
+          <td>${app.gradeBadge(syn.final_grade)}</td>
           <td>${why}</td>
-          <td>${f.decision ? app.recBadge(f.decision === "rejected" ? "rejected" : f.decision) : '<span class="badge b-outline">회의 전</span>'}</td>
+          <td>${f.decision ? app.recBadge(f.decision) : '<span class="badge b-outline">회의 전</span>'}</td>
           <td>${f.decision ? '<span class="badge b-outline" title="실제 결정 확정됨">확정</span>' : pred ? app.recBadge(pred.predicted_decision) + `<span style="font-size:10px;color:var(--text-3)"> ${pred.confidence}</span>` : '<span class="badge b-outline">—</span>'}</td>
           <td>${plc.ready === true ? '<span class="badge b-go">준비</span>' : plc.ready === false ? '<span class="badge b-nogo" title="' + [(plc.doc_issues || []).join(", "), (plc.slide_issues || []).map(x => "슬라이드" + x.slide + ": " + x.issue).join(", ")].filter(Boolean).join(" · ") + '">미준비</span>' : '<span class="badge b-outline">—</span>'}</td>
           <td>${app.riskBadge2(f)}</td>
@@ -105,18 +111,16 @@ App.register("review", {
       const f = feats.find(x => x.feature_index === idx);
       const it = rv[idx] || {}, syn = it.synthesis || {}, plc = pl[idx] || {};
       const per = it.personas || {};
+      // 엑셀 열은 관리 열 목록으로만 한 번 보여준다 (기능명·AI카테고리도 그 안에 있으므로 따로 쓰지 않는다)
+      const cols = (app.state.boot.managed_columns && app.state.boot.managed_columns.length
+        ? app.state.boot.managed_columns : Object.keys(f.row)).filter(c => f.row[c] !== undefined);
       const body = App.el(`
         <div class="kv">
-          <dt>기능명</dt><dd>${f.function_name}</dd>
-          <dt>AI카테고리</dt><dd>${f.ai_category || "—"}</dd>
-          ${(app.state.boot.managed_columns && app.state.boot.managed_columns.length
-             ? app.state.boot.managed_columns : Object.keys(f.row))
-            .filter(c => f.row[c] !== undefined)
-            .map(c => `<dt title="관리 열">${c}</dt><dd style="font-size:12px">${f.row[c] || '<span style="color:var(--text-3)">미기재</span>'}</dd>`).join("")}
+          ${cols.map(c => `<dt title="관리 열">${c}</dt><dd style="font-size:12px">${f.row[c] || '<span style="color:var(--text-3)">미기재</span>'}</dd>`).join("")}
           <dt>일정 리스크</dt><dd>${app.riskBadge2(f)}
             <span style="font-size:11.5px;color:var(--text-2)"> ${app.scheduleRisk(f).reason}</span></dd>
-          ${f.reregistered_from ? `<dt>재등록</dt><dd><span class="badge b-violet">${f.reregistered_from}에서 거절/보류 → 재등록</span></dd>` : ""}
-          ${f.decision ? `<dt>임원 결정</dt><dd>${app.recBadge(f.decision === "rejected" ? "rejected" : f.decision)} ${(f.decision_conditions || []).join(", ")}</dd>` : ""}
+          ${f.reregistered_from ? `<dt>재등록</dt><dd><span class="badge b-violet">${f.reregistered_from}에서 미지원/보류 → 재등록</span></dd>` : ""}
+          ${f.decision ? `<dt>회의 결정</dt><dd>${app.recBadge(f.decision)}${f.decision === "reject" ? ' <span style="font-size:11.5px;color:var(--text-2)">이번 버전 제외 · 다음 버전 이력 추적용</span>' : ""}</dd>` : ""}
         </div>
         <div class="section-label">등급</div>
         ${syn.final_grade ? `

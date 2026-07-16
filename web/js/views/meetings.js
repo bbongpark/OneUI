@@ -425,7 +425,7 @@ App.register("meetings", {
           ${ex.decisions.map((x, i) => `<tr>
             <td class="idx">${x.feature_index}</td>
             <td>${m.confirmed ? app.recBadge(x.decision) : `<select data-dec="${i}">
-              ${["go", "conditional_go", "defer", "no_go"].map(o => `<option value="${o}" ${x.decision === o ? "selected" : ""}>${{ go: "진행", conditional_go: "조건부", defer: "보류", no_go: "거절" }[o]}</option>`).join("")}</select>`}</td>
+              ${Object.entries(App.DECISIONS).map(([o, v]) => `<option value="${o}" ${x.decision === o ? "selected" : ""}>${v.label}</option>`).join("")}</select>`}</td>
             <td style="font-size:11.5px">${(x.conditions || []).join(", ") || "—"}</td></tr>`).join("")}
         </tbody></table>
         <div class="section-label">추출된 액션 아이템</div>

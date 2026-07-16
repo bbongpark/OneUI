@@ -146,7 +146,7 @@ def _extract_json(text):
 
 AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰이 먼저 판정)
 GRADE_ORDER = {g: i for i, g in enumerate(AI_GRADES)}
-RECS = ["go", "conditional_go", "defer", "no_go"]   # 회의 결정·예상 판정용 (리뷰 산출물 아님)
+RECS = ["support", "hold", "reject"]     # 회의 결정 = 지원 | 보류 | 미지원 (리뷰 산출물 아님)
 
 
 def _seed(s):
@@ -192,7 +192,7 @@ def _mock(persona, payload):
         for ft in feats:
             r = _seed("dir" + ft["feature_index"])
             res.append({"feature_index": ft["feature_index"],
-                        "predicted_decision": r.choices(RECS, weights=[50, 25, 17, 8])[0],
+                        "predicted_decision": r.choices(RECS, weights=[60, 28, 12])[0],
                         "predicted_conditions": [], "confidence": r.choice(["high", "medium", "low"]),
                         "rationale": "(mock) 판단 성향 기반 예측", "anticipated_questions": [r.choice(["일정 내 검증 가능한가?", "커뮤니티 반발 시나리오는?", "VOC 수치 근거는?"])],
                         "status": "ok", "reason": ""})
@@ -239,25 +239,23 @@ def _mock_minutes(minutes, feats):
             continue
         idx = m.group(1)
         low = line.lower()
-        if "조건부" in line:
-            dec = "conditional_go"
-        elif "보류" in line or "차기" in line:
-            dec = "defer"
-        elif "거절" in line or "드랍" in line or "no-go" in low or "no_go" in low:
-            dec = "no_go"
-        elif "진행" in line or "확정" in line or "go" in low:
-            dec = "go"
+        if "미지원" in line or "드랍" in line or "제외" in line or "반대" in line:
+            dec = "reject"
+        elif "보류" in line or "홀드" in line or "차기" in line or "조건부" in line:
+            dec = "hold"
+        elif "지원" in line or "진행" in line or "확정" in line or "승인" in line:
+            dec = "support"
         else:
             dec = None
         if dec:
             cond = []
             cm = re.search(r"\(([^)]+)\)", line)
-            if dec == "conditional_go" and cm:
+            if dec == "hold" and cm:
                 cond = [cm.group(1)]
             decs.append({"feature_index": idx, "decision": dec, "conditions": cond,
                          "confidence": "high", "status": "ok", "reason": ""})
         am = re.search(r"(보고|제출|검토|측정|검증)", line)
-        if am and ("까지" in line or "중" in line or dec == "conditional_go"):
+        if am and ("까지" in line or "중" in line or dec == "hold"):
             acts.append({"feature_index": idx, "action": line.split("—")[-1].strip()[:60],
                          "owner_dept": "", "due": ""})
     return {"decisions": decs, "actions": acts}

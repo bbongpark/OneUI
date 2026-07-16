@@ -162,13 +162,15 @@ const App = {
     const d = this.GRADES[g];
     return d ? `<span class="badge ${d.cls}" title="${d.full}">${d.label}</span>` : '<span class="badge b-outline">—</span>';
   },
-  recBadge(r) {
-    const m = { go: ["b-go", "진행"], conditional_go: ["b-cgo", "조건부"], defer: ["b-defer", "보류"], no_go: ["b-nogo", "반대"], rejected: ["b-rejected", "거절"] };
-    return r && m[r] ? `<span class="badge ${m[r][0]}">${m[r][1]}</span>` : '<span class="badge b-outline">—</span>';
+  // 회의 결정 3가지 — 미지원은 이번 버전에서 빠지고(통계 제외) 다음 버전 이력 추적용으로만 남는다
+  DECISIONS: {
+    support: { label: "지원", cls: "b-go" },
+    hold: { label: "보류", cls: "b-defer" },
+    reject: { label: "미지원", cls: "b-nogo" }
   },
-  riskBadge(r) {
-    const m = { high: "높음", caution: "주의", normal: "정상", unknown: "미확인" };
-    return r ? `<span class="badge b-risk-${r}">${m[r] || r}</span>` : '<span class="badge b-outline">—</span>';
+  recBadge(r) {
+    const d = this.DECISIONS[r];
+    return d ? `<span class="badge ${d.cls}">${d.label}</span>` : '<span class="badge b-outline">—</span>';
   },
   statusBadge(s) {
     const m = { ingested: ["b-p2", "인입"], reviewing: ["b-blue", "리뷰 중"], meeting_wait: ["b-violet", "회의 대기"], decided: ["b-go", "결정됨"] };

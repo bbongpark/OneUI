@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """인입 — 취합 엑셀·발표 PPT 업로드 처리 (표준 라이브러리 파서 사용).
 증분 규칙: 트리거 열이 바뀐 행만 재리뷰 대상(row_hash 갱신), 나머지는 캐시 유지.
-재등록 감지: 다른 버전에서 rejected/defer된 동일 이름 Feature를 표시.
+재등록 감지: 다른 버전에서 미지원/보류된 같은 인덱스를 표시.
 PPT: 슬라이드 텍스트에서 인덱스를 찾아 매핑. PNG 렌더링은 Office COM 필요
 (scripts/ppt_to_png.ps1) — 텍스트 매핑은 여기서, 이미지는 회사 환경에서.
 """
@@ -18,13 +18,13 @@ def _hash(row):
 
 
 def _prev_dropped(exclude_version):
-    """다른 버전들의 rejected/defer 항목: {인덱스: '버전/인덱스'} — 같은 인덱스로 재등록을 감지한다."""
+    """다른 버전들의 미지원/보류 항목: {인덱스: '버전/인덱스'} — 같은 인덱스로 재등록을 감지한다."""
     out = {}
     for v in store.versions():
         if v == exclude_version:
             continue
         for f in store.load(store.dpath(v, "features.json"), {"features": []})["features"]:
-            if f.get("decision") in ("rejected", "defer"):
+            if f.get("decision") in ("reject", "hold"):
                 out.setdefault(f["feature_index"], "%s/%s" % (v, f["feature_index"]))
     return out
 

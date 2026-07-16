@@ -3,7 +3,7 @@ App.register("dashboard", {
   title: "현황판",
   render(el, app) {
     const d = app.state.data, feats = d.features.features;
-    const alive = feats.filter(f => f.decision !== "rejected");          // rejected = 모수 제외
+    const alive = feats.filter(f => f.decision !== "reject");   // 미지원 = 이번 버전 제외 → 모수에서 뺀다
     const rv = d.reviews.items, pl = d.pl_checks.items;
     const reviewed = alive.filter(f => rv[f.feature_index] && rv[f.feature_index].synthesis);
     // 개발 완료 = 설정의 판정 규칙 (예: CL 열에 CL 번호가 있으면 완료). 열 이름·값 하드코딩 금지
@@ -16,7 +16,7 @@ App.register("dashboard", {
     const dvrSet = !!(d.schedule || {}).dvr;
     const needsHuman = alive.filter(f => (rv[f.feature_index]?.synthesis || {}).status === "needs_human");
     const decided = alive.filter(f => f.status === "decided");
-    const rejectedN = feats.length - alive.length;
+    const rejectN = feats.length - alive.length;
     const dist = g => reviewed.filter(f => rv[f.feature_index].synthesis.final_grade === g).length;
     const GC = { P0: "var(--crit)", P1: "var(--warn)", P2: "var(--p2)", SHARE: "var(--good)", DOC: "var(--serious)" };
     const gdist = Object.keys(App.GRADES).map(g => ({ g, n: dist(g), ...App.GRADES[g], color: GC[g] }));
@@ -41,7 +41,7 @@ App.register("dashboard", {
     el.innerHTML = `
       <div class="page-head">
         <div><div class="page-title">현황판</div>
-        <div class="page-sub">One UI ${app.state.version} · 전체 ${feats.length}건 · 통계 모수 ${alive.length}건 (거절 ${rejectedN}건 제외)${readonly ? " · 읽기 전용" : ""}</div></div>
+        <div class="page-sub">One UI ${app.state.version} · 전체 ${feats.length}건 · 통계 모수 ${alive.length}건 (미지원 ${rejectN}건 제외)${readonly ? " · 읽기 전용" : ""}</div></div>
         <div class="actions">
           <button class="btn primary" id="ingest-btn">① 인입 (엑셀·PPT 업로드)</button>
           <button class="btn" data-run="review" title="엑셀 기준으로 P0/P1/P2/단순 공유/문서 보완 5등급 분류 → 종합까지 자동">② 리뷰 실행 (등급 분류)</button>
@@ -82,7 +82,7 @@ App.register("dashboard", {
                <div class="num" style="font-size:15px;color:var(--accent)">DVR 필요</div>
                <div class="foot">회의 → 과제 일정에서 DVR 지정</div></div>`}
         ${kpi("사람 확인 필요", needsHuman.length, null, { cls: needsHuman.length ? "blue" : "", foot: "AI 판단 보류", drill: "needs_human" })}
-        ${kpi("결정 완료", decided.length, alive.length, { foot: `go ${decDist("go")} · 조건부 ${decDist("conditional_go")} · 보류 ${decDist("defer")}`, drill: "decided" })}
+        ${kpi("결정 완료", decided.length, alive.length, { foot: `지원 ${decDist("support")} · 보류 ${decDist("hold")}`, drill: "decided" })}
       </div>
 
       <div class="grid" style="grid-template-columns: 1.2fr 1fr; align-items:start">

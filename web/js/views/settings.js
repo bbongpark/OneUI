@@ -175,7 +175,7 @@ App.register("settings", {
         }
         const keep = app.state.boot.dev_done_rule;
         app.state.boot.dev_done_rule = { mode, column: col, values: vals, pattern: mode === "filled" ? pat : "" };
-        const alive = feats.filter(f => f.decision !== "rejected");
+        const alive = feats.filter(f => f.decision !== "reject");
         const done = alive.filter(f => app.isDevDone(f));
         const sample = done.slice(0, 3).map(f => `${f.feature_index}=${(f.row || {})[col]}`).join(" · ");
         app.state.boot.dev_done_rule = keep;

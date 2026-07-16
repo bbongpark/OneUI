@@ -342,7 +342,7 @@ def api_meetings_confirm(b):
         for f in obj["features"]:
             d = dmap.get(f["feature_index"])
             if d:
-                f["decision"] = "rejected" if d["decision"] == "no_go" else d["decision"]
+                f["decision"] = d["decision"]
                 f["decision_conditions"] = d.get("conditions", [])
                 f["status"] = "decided"
         return obj
@@ -376,9 +376,9 @@ def api_meetings_confirm(b):
         store.update(store.dpath(v, "prediction_stats.json"), fn_p, {"rev": 0, "runs": []})
         store.notify("persona", "SW담당 예상 적중률 %d%% (%d건, %s)" % (acc, len(comps), mid))
     store.notify("meeting", "%s 확정 — 결정 %d건, 액션 %d건" % (mid, len(decisions), len(actions)))
-    rej = sum(1 for d in decisions if d["decision"] == "no_go")
+    rej = sum(1 for d in decisions if d["decision"] == "reject")
     if rej:
-        store.notify("meeting", "거절 %d건 — 통계 모수에서 제외됨" % rej)
+        store.notify("meeting", "미지원 %d건 — 이번 버전에서 제외(통계 제외), 다음 버전 이력 추적용으로 보관" % rej)
     return {"ok": True}
 
 
@@ -558,8 +558,10 @@ def api_mapping_confirm(b):
 
 # ---------- 골든셋 업로드 ----------
 
-REC_ALIAS = {"go": "go", "진행": "go", "conditional_go": "conditional_go", "조건부": "conditional_go",
-             "defer": "defer", "보류": "defer", "no_go": "no_go", "거절": "no_go", "반대": "no_go"}
+# 회의 결정 = 지원 | 보류 | 미지원 (골든셋 엑셀의 한글 표기도 받아준다)
+REC_ALIAS = {"support": "support", "지원": "support", "진행": "support",
+             "hold": "hold", "보류": "hold", "조건부": "hold",
+             "reject": "reject", "미지원": "reject", "거절": "reject", "반대": "reject"}
 
 
 def _golden_cols():

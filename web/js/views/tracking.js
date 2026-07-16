@@ -4,7 +4,7 @@ App.register("tracking", {
   render(el, app) {
     const d = app.state.data, acts = d.actions.items;
     const feats = d.features.features;
-    const rejected = feats.filter(f => f.decision === "rejected");
+    const rejected = feats.filter(f => f.decision === "reject");
     const readonly = d.features.readonly;
     const PLM_LBL = { pending: ["b-outline", "대기"], sent: ["b-blue", "전송됨"], in_progress: ["b-cgo", "처리 중"], done: ["b-go", "완료"] };
 
@@ -36,12 +36,12 @@ App.register("tracking", {
         </tbody></table>
       </div></div>
 
-      <div class="card"><div class="card-head">거절 목록 <span class="sub">통계 모수에서 제외 · 차기 버전 재등록 감지용</span></div>
+      <div class="card"><div class="card-head">미지원 목록 <span class="sub">이번 버전에서 제외(통계 모수 제외) · 다음 버전 재등록 이력 추적용</span></div>
         <div class="card-body">
           ${rejected.length ? `<table class="tbl"><thead><tr><th>인덱스</th><th>제목</th><th>기능명</th><th>비고</th></tr></thead><tbody>
             ${rejected.map(f => `<tr><td class="idx">${f.feature_index}</td><td>${f.name}</td><td>${f.function_name}</td>
-              <td style="font-size:11.5px;color:var(--text-3)">차기 버전 인입 시 자동 매칭되어 "재등록" 표시됨</td></tr>`).join("")}</tbody></table>`
-            : '<div class="empty">거절된 항목 없음</div>'}
+              <td style="font-size:11.5px;color:var(--text-3)">다음 버전 인입 시 자동 매칭되어 "재등록" 표시됨</td></tr>`).join("")}</tbody></table>`
+            : '<div class="empty">미지원 항목 없음</div>'}
         </div>
       </div>`;
 

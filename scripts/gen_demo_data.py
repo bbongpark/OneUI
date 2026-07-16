@@ -38,7 +38,7 @@ STATUS_POOL = ["기획완료", "설계중", "구현중", "구현완료", "검증
 MODELS = ["전 모델", "플래그십", "폴더블", "플래그십+폴더블"]
 AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰)
 G_ORDER = {g: i for i, g in enumerate(AI_GRADES)}
-RECS = ["go", "conditional_go", "defer", "no_go"]   # 회의 결정용
+RECS = ["support", "hold", "reject"]     # 회의 결정 = 지원 | 보류 | 미지원
 CHANGE_TYPES = ["기능 추가", "동작 변경", "UI 개선", "문구 수정", "오타 수정", "성능 개선"]
 PERSONAS = ["experience_planning", "ux", "dev", "cxi"]
 P_LABEL = {"experience_planning": "경험기획", "ux": "UX", "dev": "개발", "cxi": "CXI"}
@@ -90,7 +90,7 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         status = "meeting_wait" if st_reviewed else ("reviewing" if i <= int(n * reviewed_ratio) + 6 else "ingested")
         decision = None
         if st_decided:
-            decision = random.choices(["go", "conditional_go", "defer", "rejected"], weights=[55, 20, 15, 10])[0]
+            decision = random.choices(["support", "hold", "reject"], weights=[62, 26, 12])[0]
             status = "decided"
         reregistered = None
         if prev_rejected and i % 17 == 0 and prev_rejected:
@@ -102,7 +102,7 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             "function_name": func, "ai_category": cat,
             "row": row, "row_hash": h(json.dumps(row, ensure_ascii=False)),
             "status": status, "decision": decision,
-            "decision_conditions": ["정량 근거 보완 후 재확인"] if decision == "conditional_go" else [],
+            "decision_conditions": ["정량 근거 보완 후 재확인"] if decision == "hold" else [],
             "slides": [f"{idx}_{k}.svg" for k in range(1, 4)] if i <= 12 else ([f"{idx}_1.svg"] if i % 3 else []),
             "reregistered_from": reregistered, "input_changed": (i % 23 == 0 and st_reviewed),
         })
@@ -163,7 +163,7 @@ def main():
 
     # ---- 8.0 (지난 버전, 읽기 전용) ----
     f80, r80, p80 = make_version("8.0", 40, 1.0, 1.0)
-    rejected80 = [f["feature_index"] for f in f80 if f["decision"] == "rejected"]
+    rejected80 = [f["feature_index"] for f in f80 if f["decision"] == "reject"]
     json.dump({"version": "8.0", "readonly": True, "features": f80}, open(D("8.0", "features.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     json.dump({"rev": 1, "items": r80}, open(D("8.0", "reviews.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     json.dump({"rev": 1, "items": p80}, open(D("8.0", "pl_checks.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -203,11 +203,11 @@ def main():
     # 회의록/결정
     json.dump({"rev": 1, "items": [
         {"id": "M1", "date": "2026-07-20", "time": "10:00", "title": "리뷰 회의 1차",
-         "minutes_raw": "F001 잠금화면 위젯 — 진행 확정. 커버화면 시나리오 8월 중 보고.\nF002 카메라 야간모드 — 조건부 진행 (배터리 영향 수치 보완).\nF003 홈 폴더 색상 — 차기 버전 보류.",
+         "minutes_raw": "F001 잠금화면 위젯 — 지원 확정. 커버화면 시나리오 8월 중 보고.\nF002 카메라 야간모드 — 보류 (배터리 영향 수치 보완 후 재논의).\nF003 홈 폴더 색상 — 미지원, 이번 버전 제외.",
          "extracted": {"decisions": [
-             {"feature_index": "F001", "decision": "go", "conditions": []},
-             {"feature_index": "F002", "decision": "conditional_go", "conditions": ["배터리 영향 수치 보완"]},
-             {"feature_index": "F003", "decision": "defer", "conditions": []}],
+             {"feature_index": "F001", "decision": "support", "conditions": []},
+             {"feature_index": "F002", "decision": "hold", "conditions": ["배터리 영향 수치 보완"]},
+             {"feature_index": "F003", "decision": "reject", "conditions": []}],
              "actions": [{"feature_index": "F001", "action": "커버화면 시나리오 검증 결과 보고", "owner_dept": "홈/런처", "due": "2026-08-14"},
                          {"feature_index": "F002", "action": "배터리 소모 측정 리포트 제출", "owner_dept": "카메라", "due": "2026-08-07"}]},
          "confirmed": True, "confirmed_by": "관리자", "confirmed_at": "2026-07-20T16:00:00"}

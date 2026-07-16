@@ -135,7 +135,7 @@ def job_review(job):
     personas = ["persona-experience-planning", "persona-ux", "persona-dev", "persona-cxi"]
     only = job["params"].get("personas") or personas
     reviews = store.load(rv_fp, {"rev": 0, "items": {}})
-    alive = [f for f in feats if f["status"] != "decided" and f.get("decision") != "rejected"]
+    alive = [f for f in feats if f["status"] != "decided" and f.get("decision") != "reject"]
 
     # ① 자료 보완 필요(DOC) — 변경점이 부실하면 AI가 판단할 수 없다. 앞단에서 거른다
     hard = {}
@@ -209,7 +209,7 @@ def job_synthesis(job):
     # 하드룰로 확정된 건은 종합에서 제외 (이미 등급이 정해졌다)
     ready = [f for f in feats if len(reviews["items"].get(f["feature_index"], {}).get("personas", {})) == 4
              and not reviews["items"].get(f["feature_index"], {}).get("hard_rule")
-             and f.get("decision") != "rejected"]
+             and f.get("decision") != "reject"]
     fmap = {f["feature_index"]: f for f in feats}
     for batch in _batches(ready, v):
         payload = {"features": [{"feature_index": f["feature_index"], "row": _row_view(f["row"]),
@@ -248,7 +248,7 @@ def job_synthesis(job):
 
 def job_pl(job):
     v = job["version"]
-    feats = [f for f in _features(v)["features"] if f.get("decision") != "rejected"]
+    feats = [f for f in _features(v)["features"] if f.get("decision") != "reject"]
     sched = store.load(store.dpath(v, "schedule.json"), {})
     for batch in _batches(feats, v):
         payload = {"features": [{"feature_index": f["feature_index"], "row": _row_view(f["row"]), "slides": f["slides"]} for f in batch],
