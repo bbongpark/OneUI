@@ -46,20 +46,25 @@ App.register("meetings", {
             </div>
           </div>
         </div>
-        <div class="card"><div class="card-head">SW담당 예상 적중률
-          <span class="sub">회의 확정 시 자동 측정 — 예상 vs 실제 결정</span></div>
+        <div class="card"><div class="card-head"><span style="white-space:nowrap">SW 담당님 예상 적중률</span>
+          <span class="sub">예상 vs 실제 결정 일치율</span></div>
           <div class="card-body">
             ${stats.length ? `<div style="display:flex;gap:18px;align-items:flex-start">
                 <div style="flex:0 0 auto">
+                  <div style="font-size:11px;color:var(--text-3)">최근 회의 (${stats[0].meeting_id})</div>
                   <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:var(--accent)">${stats[0].accuracy}%</div>
-                  <div style="font-size:11.5px;color:var(--text-2)">최근 ${stats[0].n}건 · ${stats[0].meeting_id}</div>
+                  <div style="font-size:11.5px;color:var(--text-2)">안건 ${stats[0].n}건 중 ${Math.round(stats[0].accuracy / 100 * stats[0].n)}건 적중</div>
                 </div>
                 <div style="flex:1;min-width:0">
-                  <div class="acc-chart" style="height:70px">${stats.slice(0, 10).reverse().map(r =>
-                    `<div class="bar" style="height:${Math.max(r.accuracy, 4)}%" title="${r.meeting_id} · ${r.n}건 · ${r.accuracy}%"><span>${r.accuracy}</span></div>`).join("")}</div>
-                  <p style="font-size:11px;color:var(--text-3);margin-top:4px">회의록이 쌓일수록 SW담당 페르소나의 판단 성향을 보강하세요</p>
+                  <div style="font-size:10.5px;color:var(--text-3);margin-bottom:2px">회의별 적중률 추이 (막대 1개 = 회의 1회)</div>
+                  <div class="acc-chart" style="height:64px">${stats.slice(0, 10).reverse().map(r =>
+                    `<div class="acc-col" title="${r.meeting_id} · 안건 ${r.n}건 · 적중 ${r.accuracy}%">
+                       <div class="bar" style="height:${Math.max(r.accuracy, 4)}%"><span>${r.accuracy}%</span></div>
+                       <div class="acc-lbl">${r.meeting_id}</div>
+                     </div>`).join("")}</div>
                 </div>
-              </div>`
+              </div>
+              <p style="font-size:11px;color:var(--text-3);margin-top:8px">회의록이 쌓일수록 SW담당 페르소나의 판단 성향을 보강하세요</p>`
               : '<div class="empty" style="padding:20px 0">아직 측정 없음 — 회의록을 확정하면 예상과 실제를 비교해 기록합니다</div>'}
           </div>
         </div>
