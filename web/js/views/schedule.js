@@ -5,7 +5,7 @@ App.register("schedule", {
   render(el, app) {
     const d = app.state.data, feats = d.features.features;
     const fields = app.state.boot.schema_fields || {};
-    const devCol = fields.dev_schedule, ownerCol = fields.dev_owner;
+    const devCol = fields.dev_schedule, ownerCol = fields.dev_owner_mail;
     const changeCol = fields.change_summary, reasonCol = fields.dev_delay_reason;
     const ver = app.state.version;
     const today = (() => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })();

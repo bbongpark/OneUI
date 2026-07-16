@@ -11,6 +11,7 @@
     "ux_schedule": "UX일정",
     "dev_schedule": "개발일정",
     "dev_owner": "개발담당자",
+    "dev_owner_mail": "개발담당자메일",
     "dev_delay_reason": "지연사유",
     "dev_group": "개발그룹",
     "group_lead": "그룹장",
@@ -18,7 +19,8 @@
     "ux_owner": "UX담당자",
     "cxi_owner": "CXI담당자"
   },
-  "_meeting_owner_comment": "회의 공지 메일 표·수신자에 쓰는 열(선택). 회의 화면 안건 배정의 메일 초안이 그룹장·개발담당자·EP/UX/CXI담당자 열에서 .com 메일을 모아 수신자로, 개발그룹·그룹장·각 담당자를 표 열로 쓴다. 회사 실제 열 이름으로 교체.",
+  "_meeting_owner_comment": "담당자 '이름' 열(group_lead·dev_owner·ep/ux/cxi_owner)은 회의 공지 메일 '표'에 들어가고, 수신자(메일주소)는 아래 meeting_recipient_columns 열들에서 .com을 모아 만든다. 일정 관리 화면 수신자는 dev_owner_mail 열에서 뽑는다. 회사 실제 열 이름으로 교체.",
+  "meeting_recipient_columns": ["개발담당자메일", "EP담당자메일", "UX담당자메일", "CXI담당자메일"],
   "_dev_owner_comment": "개발 담당자 메일 열(선택). 일정 관리 화면이 공지 메일 수신자를 이 열에서 뽑는다 — 셀 값에서 '.com'으로 끝나는 토큰을 추출해 ;로 연결한다. 회사 실제 열 이름으로 교체.",
   "_dev_delay_reason_comment": "개발일정 지연사유 열(선택). 개발일정을 뒤로 미룬 기능은 이 열에 사유를 적는다. 인입 시 이전 대비 개발일정이 늦어진 행을 감지해 알림을 발행하고, 일정 관리 화면·공지 메일 표에 표시한다.",
   "_dev_done_rule_comment": "개발 완료 판정 규칙. mode=filled: column에 값이 있으면 완료 (예: CL 열에 CL 번호). mode=values: column의 값이 values 중 하나면 완료. pattern(선택): 정규식으로 값 형식 검증. '-', 'TBD' 등 자리채움 값은 빈 값으로 본다. 설정 화면에서 편집.",

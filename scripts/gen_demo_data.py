@@ -34,15 +34,21 @@ NAMES = [
     "PDF 스캔 문서 보정", "듀얼 메신저 알림 뱃지 구분", "라이브 캡션 다국어",
     "빅스비 루틴 추천 카드", "충전 완료 알림 사운드 설정"
 ]
-DEV_OWNERS = ["jh.kim@partner-dev.com", "yr.lee@partner-dev.com", "sw.park@partner-dev.com",
-              "mj.choi@partner-dev.com", "dh.jung@partner-dev.com", "hs.kang@partner-dev.com"]  # 개발담당자 메일
 DELAY_REASONS = ["선행 과제 의존성 지연", "인력 재배치로 착수 지연", "설계 변경으로 재작업",
                  "QA 이슈 대응 우선", "타 부서 API 제공 일정 지연"]  # 개발일정 지연사유
 DEV_GROUPS = ["플랫폼1그룹", "플랫폼2그룹", "UX플랫폼그룹", "카메라SW그룹", "커넥티비티그룹"]  # 개발그룹
-GROUP_LEADS = ["gl.shin@samsung.com", "gl.oh@samsung.com", "gl.yoon@samsung.com", "gl.bae@samsung.com"]  # 그룹장
-EP_OWNERS = ["ep.han@samsung.com", "ep.seo@samsung.com", "ep.moon@samsung.com"]   # EP담당자
-UX_OWNERS = ["ux.lim@samsung.com", "ux.jang@samsung.com", "ux.noh@samsung.com"]   # UX담당자
-CXI_OWNERS = ["cxi.woo@samsung.com", "cxi.hong@samsung.com", "cxi.ryu@samsung.com"]  # CXI담당자
+# 담당자 '이름' 열 — 회의 표에 표시
+LEAD_NAMES = ["신동주", "오세훈", "윤재영", "배성민"]
+DEV_NAMES = ["김진호", "이유리", "박상우", "최민재", "정도현", "강현수"]
+EP_NAMES = ["한지수", "서민경", "문태원"]
+UX_NAMES = ["임하늘", "장예린", "노준호"]
+CXI_NAMES = ["우성재", "홍가영", "류지원"]
+# 메일주소 열 — 수신자(;연결)에 쓰는 4개 열
+DEV_MAILS = ["jh.kim@partner-dev.com", "yr.lee@partner-dev.com", "sw.park@partner-dev.com",
+             "mj.choi@partner-dev.com", "dh.jung@partner-dev.com", "hs.kang@partner-dev.com"]
+EP_MAILS = ["ep.han@samsung.com", "ep.seo@samsung.com", "ep.moon@samsung.com"]
+UX_MAILS = ["ux.lim@samsung.com", "ux.jang@samsung.com", "ux.noh@samsung.com"]
+CXI_MAILS = ["cxi.woo@samsung.com", "cxi.hong@samsung.com", "cxi.ryu@samsung.com"]
 STATUS_POOL = ["기획완료", "설계중", "구현중", "구현완료", "검증중", "검증완료"]
 MODELS = ["전 모델", "플래그십", "폴더블", "플래그십+폴더블"]
 AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰)
@@ -94,17 +100,21 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             "변경점": change,
             "VOC건수": random.choice(["", str(random.randint(20, 4200))]),
         }
-        # 개발 담당자 메일 — 개발 일정이 잡힌 항목에만. 셀에 1~2명이 공백으로 들어간다(.com 아이디).
-        row["개발담당자"] = " ".join(random.sample(DEV_OWNERS, random.randint(1, 2))) if dev_d else ""
+        # 담당자 '이름' 열 (표시용) + '메일주소' 열 (수신자용) 분리 — 실제 엑셀 구조 반영
+        row["개발담당자"] = random.choice(DEV_NAMES)           # 이름
+        row["개발담당자메일"] = " ".join(random.sample(DEV_MAILS, random.randint(1, 2))) if dev_d else random.choice(DEV_MAILS)
         # 개발일정 지연 — 일부 항목은 일정을 뒤로 미뤘고 지연사유가 있다(비지연은 빈칸)
         delayed = bool(dev_d) and random.random() < 0.25
         row["지연사유"] = random.choice(DELAY_REASONS) if delayed else ""
-        # 회의 공지 메일용 — 개발그룹·그룹장·부문 담당자 (전 항목)
+        # 회의 공지 메일용 — 개발그룹 + 담당자 이름(표) + 부문 메일(수신자)
         row["개발그룹"] = random.choice(DEV_GROUPS)
-        row["그룹장"] = random.choice(GROUP_LEADS)
-        row["EP담당자"] = random.choice(EP_OWNERS)
-        row["UX담당자"] = random.choice(UX_OWNERS)
-        row["CXI담당자"] = random.choice(CXI_OWNERS)
+        row["그룹장"] = random.choice(LEAD_NAMES)              # 이름 (표)
+        row["EP담당자"] = random.choice(EP_NAMES)              # 이름 (표)
+        row["UX담당자"] = random.choice(UX_NAMES)              # 이름 (표)
+        row["CXI담당자"] = random.choice(CXI_NAMES)            # 이름 (표)
+        row["EP담당자메일"] = random.choice(EP_MAILS)          # 메일 (수신자)
+        row["UX담당자메일"] = random.choice(UX_MAILS)
+        row["CXI담당자메일"] = random.choice(CXI_MAILS)
         # AI 상세 열 — AI 관련 Feature에만 값이 있다(비AI는 빈칸). config/excel_schema.json의 ai_detail로 상세에 표시.
         is_ai = cat != "AI 없음"
         row.update({

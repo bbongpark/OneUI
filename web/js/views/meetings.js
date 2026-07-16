@@ -253,8 +253,9 @@ App.register("meetings", {
       const flds = app.state.boot.schema_fields || {};
       const cell = (f, key) => (f.row || {})[flds[key]] || "";
       const list = s.items.map(i => fmap[i.feature_index]).filter(Boolean);
-      const ownerKeys = ["group_lead", "dev_owner", "ep_owner", "ux_owner", "cxi_owner"];
-      const recipients = [...new Set(list.flatMap(f => ownerKeys.flatMap(k => App.extractMails(cell(f, k)))))].join(";");
+      // 수신자: 메일주소 열들(config)에서 .com 추출 · 표: 담당자 이름 열들
+      const mailCols = app.state.boot.meeting_recipient_columns || [];
+      const recipients = [...new Set(list.flatMap(f => mailCols.flatMap(col => App.extractMails((f.row || {})[col]))))].join(";");
       const dw = DOW[new Date(ds + "T00:00:00").getDay()];
       app.mailDraftModal({
         title: `회의 공지 메일 초안 — ${ds}`,
@@ -290,10 +291,10 @@ App.register("meetings", {
         const dw = DOW[new Date(ds + "T00:00:00").getDay()];
         return `<div class="bcol ${used > s.capacity_min ? "over-cap" : ""}" data-drop="${ds}">
           <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span>
-            ${s.items.length ? `<button class="btn ghost small" data-mail="${ds}" title="이 회의일 공지 메일 초안" style="padding:0 4px">✉</button>` : ""}
             <button class="btn ghost small x" data-hide="${ds}" title="안건 배정에서 숨기기 (회의일은 유지됩니다)" style="padding:0 4px">✕</button></div>
           <div class="cap"><span>${s.items.length}건</span><span style="${used > s.capacity_min ? "color:var(--crit);font-weight:700" : ""}">${used}/${s.capacity_min}분</span></div>
           <div class="meter ${used > s.capacity_min ? "over" : pct > 85 ? "warn" : ""}"><i style="width:${pct}%"></i></div>
+          ${s.items.length ? `<button class="btn small" data-mail="${ds}" style="width:100%;margin:2px 0 6px">✉ 공지 메일 초안</button>` : ""}
           ${s.items.map(i => card(i, i.feature_index)).join("") || '<div class="empty-drop">여기로 안건을 끌어오세요</div>'}
         </div>`;
       }).join("");

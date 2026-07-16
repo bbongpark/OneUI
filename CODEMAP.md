@@ -160,7 +160,7 @@
 | `slideViewer(feature, plCheck)` | 슬라이드 좌우 뷰어(PL 지적 오버레이). |
 | `el(html)` / `fmtDate(s)` / `toast(msg, err)` | 유틸. |
 | `copyText(s)` / `copyRich(html, plain)` | 클립보드 복사. **secure context(localhost/https)면 navigator.clipboard, 사내 http면 execCommand 폴백** — 둘 다 지원해야 회사 배포에서 동작. |
-| `extractMails(s)` / `mailTableHtml(cols,rows)` / `mailDraftModal(o)` | 공지 메일 초안 공용. `extractMails`는 셀에서 `.com` 메일만 추출. `mailDraftModal`은 수신자·제목·편집 가능 인사말/맺음말·표(검은 무채색)·복사 버튼. `o.tableAtEnd`=false면 인사말·표·맺음말(일정 관리), true면 인사말·맺음말·표 맨 끝(회의). 일정 관리·회의가 이걸 공유한다. |
+| `extractMails(s)` / `mailTableHtml(cols,rows,wideCols)` / `mailDraftModal(o)` | 공지 메일 초안 공용. `extractMails`는 셀에서 `.com` 메일만 추출. `mailDraftModal`은 수신자·제목·편집 가능 인사말/맺음말·표(검은 무채색, 긴 열 `wideCols`는 min-width로 세로 눌림 방지, 기본 `["변경점"]`)·복사 버튼. `o.tableAtEnd`=false면 인사말·표·맺음말(일정 관리), true면 인사말·맺음말·표 맨 끝(회의). 담당자 **이름** 열은 표에, **메일주소** 열(`meeting_recipient_columns`)은 수신자에 쓴다. |
 
 - **색 규칙**: P0=적, P1=호박, P2=회색, 리스크/미준비=경고색, **파랑=사람이 눌러야 할 곳**(AI 제안 대기).
 - **텍스트 배지 규칙**: 등급 딱지엔 P0/P1/P2/공유/보완만. 수정·확인·충돌 같은 플래그는 "판정 근거" 열로.

@@ -165,6 +165,7 @@ def api_bootstrap():
             "managed_columns": sc.get("managed_columns", []),
             "dev_done_rule": sc.get("dev_done_rule", {}),
             "ai_detail": sc.get("ai_detail", {}),
+            "meeting_recipient_columns": sc.get("meeting_recipient_columns", []),
             "schema_fields": sc.get("fields", {}),
             "engine": {"default": eng.get("default_engine"), "names": list((eng.get("engines") or {}).keys())}}
 
