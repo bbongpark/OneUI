@@ -11,7 +11,9 @@ App.register("dashboard", {
     const devDone = dvRule.column ? alive.filter(f => app.isDevDone(f)) : [];
     const plChecked = alive.filter(f => pl[f.feature_index]);
     const plReady = plChecked.filter(f => pl[f.feature_index].ready);
-    const riskHigh = alive.filter(f => (pl[f.feature_index] || {}).schedule_risk === "high");
+    // 일정 리스크 = 결정적 규칙 (개발 일정 > DVR). PL 검사 실행 전에도 즉시 판정된다
+    const riskHigh = alive.filter(f => app.scheduleRisk(f).level === "high");
+    const dvrSet = !!(d.schedule || {}).dvr;
     const needsHuman = alive.filter(f => (rv[f.feature_index]?.synthesis || {}).status === "needs_human");
     const decided = alive.filter(f => f.status === "decided");
     const rejectedN = feats.length - alive.length;
@@ -71,7 +73,12 @@ App.register("dashboard", {
                <div class="num" style="font-size:15px;color:var(--accent)">설정 필요</div>
                <div class="foot">설정 → 개발 완료 판정 규칙 지정</div></div>`}
         ${kpi("PL 통과율", plReady.length, plChecked.length || 1, { foot: `미준비 ${plChecked.length - plReady.length}건`, color: "var(--serious)", drill: "notready" })}
-        ${kpi("일정 리스크", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: "high 등급 건수", drill: "risk" })}
+        ${dvrSet
+          ? kpi("일정 리스크", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: `개발 일정 > DVR (${d.schedule.dvr})`, drill: "risk" })
+          : `<div class="kpi" data-drill="dvr" title="회의 화면에서 DVR을 지정하세요">
+               <div class="lbl"><span>일정 리스크</span></div>
+               <div class="num" style="font-size:15px;color:var(--accent)">DVR 필요</div>
+               <div class="foot">회의 → 과제 일정에서 DVR 지정</div></div>`}
         ${kpi("사람 확인 필요", needsHuman.length, null, { cls: needsHuman.length ? "blue" : "", foot: "AI 판단 보류", drill: "needs_human" })}
         ${kpi("결정 완료", decided.length, alive.length, { foot: `go ${decDist("go")} · 조건부 ${decDist("conditional_go")} · 보류 ${decDist("defer")}`, drill: "decided" })}
       </div>
@@ -120,8 +127,10 @@ App.register("dashboard", {
       ${(q.done || []).slice(0, 6).map(x => `<div style="font-size:12px;padding:3px 0;color:var(--text-2)">${x.ok ? "✅" : "❌"} ${x.label} <span style="color:var(--text-3)">${x.at.slice(11, 16)}</span></div>`).join("") || '<div style="color:var(--text-3);font-size:12px">기록 없음</div>'}`;
 
     el.querySelectorAll("[data-run]").forEach(b => b.onclick = () => app.run(b.dataset.run));
-    el.querySelectorAll("[data-drill]").forEach(k => k.onclick = () =>
-      location.hash = k.dataset.drill === "settings" ? "#/settings" : "#/review?f=" + k.dataset.drill);
+    el.querySelectorAll("[data-drill]").forEach(k => k.onclick = () => {
+      const t = k.dataset.drill;
+      location.hash = t === "settings" ? "#/settings" : t === "dvr" ? "#/meetings" : "#/review?f=" + t;
+    });
 
     // ── ① 인입 업로드 모달 ──
     el.querySelector("#ingest-btn").onclick = () => {
@@ -130,6 +139,8 @@ App.register("dashboard", {
         <div class="kv" style="grid-template-columns:110px 1fr;margin-bottom:12px">
           <dt>대상 버전</dt><dd><input id="in-ver" value="${app.state.version}" style="width:120px">
             <span style="font-size:11px;color:var(--text-3)"> 새 버전명을 입력하면 버전이 생성됩니다 (예: 9.0)</span></dd>
+          <dt>DVR</dt><dd><input type="date" id="in-dvr" value="${(d.schedule || {}).dvr || ""}">
+            <span style="font-size:11px;color:var(--text-3)"> 개발 일정이 이 날짜를 넘으면 일정 리스크로 판정 (회의 화면에서 수정 가능)</span></dd>
         </div>
         <div class="dropzone" id="in-drop">
           <span class="big">⬆</span>
@@ -148,6 +159,7 @@ App.register("dashboard", {
         const b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result.split(",")[1]); r.onerror = no; r.readAsDataURL(file); });
         try {
           const r = await app.api("/api/ingest/upload", { filename: file.name, b64, version: ver,
+            dvr: body.querySelector("#in-dvr").value || undefined,
             user: app.state.user.name, role: app.state.user.role });
           res.lastElementChild.outerHTML = r.kind === "xlsx"
             ? `<div class="info-banner">📄 ${file.name} — 전체 ${r.total} · 신규 ${r.new} · 변경 ${r.changed} · 캐시 유지 ${r.kept}${r.reregistered ? ` · <b>재등록 ${r.reregistered}</b>` : ""}${r.missing.length ? ` · 갱신본에 없음 ${r.missing.length}건` : ""}</div>`

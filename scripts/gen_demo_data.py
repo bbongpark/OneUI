@@ -3,7 +3,7 @@
 실행: python scripts/gen_demo_data.py   (프로젝트 루트에서)
 회사에서는 이 스크립트 대신 실제 엑셀 인입(scripts/excel_to_json.ps1)을 쓴다.
 """
-import json, os, random, hashlib, datetime
+import json, os, random, hashlib, datetime  # noqa: F401
 
 random.seed(85)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -61,9 +61,16 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         # CL 열: 실제 운영에서 개발 완료 판정 기준 — 커밋된 건만 CL 번호가 채워진다
         cl = str(random.randint(4100000, 4999999)) if dev_st in ("구현완료", "검증중", "검증완료") else \
              random.choice(["", "", "", "-", "TBD"])
+        # 일정: UX 일정이 있어야 개발 일정이 나온다. 개발 일정이 DVR(8/28)을 넘으면 리스크
+        ux_d = None if random.random() < 0.12 else datetime.date(2026, 7, random.randint(20, 31))
+        dev_d = None if (ux_d is None or random.random() < 0.15) else \
+            ux_d + datetime.timedelta(days=random.randint(14, 55))
         row = {
             "인덱스": idx, "Feature명": name, "제안부서": dept,
-            "개발상태": dev_st, "CL": cl, "적용모델": random.choice(MODELS),
+            "개발상태": dev_st, "CL": cl,
+            "UX일정": ux_d.isoformat() if ux_d else "",
+            "개발일정": dev_d.isoformat() if dev_d else "",
+            "적용모델": random.choice(MODELS),
             "변경점": f"[변경 전] 기존 {name.split()[0]} 동작 유지 → [변경 후] {name} 적용. 사유: 사용성 개선 및 VOC 대응. 영향: {dept} 모듈.",
             "목표시나리오": f"{dept} 사용 빈도 상위 시나리오 개선",
             "VOC건수": random.choice(["", str(random.randint(20, 4200))]),
@@ -117,14 +124,10 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
                                          "by": "관리자", "reason": "전략 과제로 상향", "at": NOW + "T10:20:00"}
             reviews[idx] = entry
         if st_reviewed:
-            risk = random.choices(["normal", "caution", "high", "unknown"], weights=[55, 22, 13, 10])[0]
             issues_doc = [] if random.random() < 0.62 else [random.choice(["'VOC건수' 미기입", "'변경점' 템플릿 미준수 — 영향 범위 없음", "'적용모델' 미기입"])]
             issues_slide = [] if random.random() < 0.7 else [{"slide": random.randint(1, 3), "issue": random.choice(["우측 상단 표 2칸 빈칸", "VOC 언급에 정량 수치 없음", "변경 전/후 비교 슬라이드 없음"])}]
             plc[idx] = {"ready": not issues_doc and not issues_slide, "doc_issues": issues_doc,
-                        "slide_issues": issues_slide, "schedule_risk": risk,
-                        "risk_rationale": {"high": "개발 완료 마일스톤까지 3주, 상태는 설계중", "caution": "검증 기간이 빠듯함",
-                                           "normal": "마일스톤 대비 진행 정상", "unknown": "진행 상태 정보를 찾을 수 없음"}[risk],
-                        "status": "ok"}
+                        "slide_issues": issues_slide, "status": "ok"}
     return feats, reviews, plc
 
 def main():
@@ -164,9 +167,8 @@ def main():
                 mins += est
                 di += 1
             slots.append({"date": d, "time": hour, "items": take, "capacity_min": 60})
-    json.dump({"rev": 2, "milestones": [
+    json.dump({"rev": 2, "dvr": "2026-08-28", "milestones": [
         {"name": "UX 시안 확정", "date": "2026-07-31"},
-        {"name": "기능 개발 완료", "date": "2026-08-28"},
         {"name": "검증 시작", "date": "2026-09-04"},
         {"name": "최종 빌드", "date": "2026-09-25"},
     ], "period": {"from": "2026-07-20", "to": "2026-07-23"}, "slots": slots},

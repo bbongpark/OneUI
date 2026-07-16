@@ -185,10 +185,7 @@ def job_pl(job):
         store.update(store.dpath(v, "pl_checks.json"), apply, {"rev": 0, "items": {}})
     items = store.load(store.dpath(v, "pl_checks.json"), {"items": {}})["items"]
     bad = sum(1 for x in items.values() if not x.get("ready"))
-    hi = sum(1 for x in items.values() if x.get("schedule_risk") == "high")
     store.notify("job", "PL 검사 완료 (%s) — 미준비 %d건" % (v, bad))
-    if hi:
-        store.notify("risk", "일정 리스크 high %d건 감지 (%s)" % (hi, v))
 
 
 def job_schedule(job):

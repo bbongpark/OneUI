@@ -186,6 +186,37 @@ const App = {
     return true;
   },
 
+  // ── 일정 리스크 판정 (결정적 규칙 — AI 판단 아님) ──
+  // 규칙: UX 일정이 있어야 개발 일정이 나온다 → 개발 일정이 DVR(과제 설정)을 넘으면 리스크.
+  // 엑셀의 날짜 문자열 → Date(로컬 자정). ISO 문자열을 new Date()에 그대로 넘기면
+  // UTC로 해석돼 하루 밀리므로 반드시 숫자를 뽑아 로컬로 만든다.
+  parseDate(v) {
+    const s = String(v == null ? "" : v).trim();
+    if (!s || this.PLACEHOLDERS.includes(s.toLowerCase())) return null;
+    const m = s.match(/(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return isNaN(d) ? null : d;
+  },
+
+  scheduleRisk(f) {
+    const dvr = this.parseDate((this.state.data.schedule || {}).dvr);
+    const fields = (this.state.boot.schema_fields) || {};
+    const uxCol = fields.ux_schedule, devCol = fields.dev_schedule;
+    if (!dvr || !devCol) return { level: "unknown", reason: !dvr ? "DVR 미설정 — 회의 화면에서 과제 일정 지정" : "개발 일정 열 미지정 — 설정에서 연결" };
+    const row = f.row || {};
+    const dev = this.parseDate(row[devCol]);
+    const ux = uxCol ? this.parseDate(row[uxCol]) : null;
+    if (dev) {
+      const over = Math.round((dev - dvr) / 86400000);
+      return over > 0
+        ? { level: "high", reason: `개발 일정(${row[devCol]})이 DVR을 ${over}일 초과` }
+        : { level: "normal", reason: `개발 일정(${row[devCol]}) DVR 이내 (${-over}일 여유)` };
+    }
+    if (uxCol && !ux) return { level: "high", reason: "UX 일정 미정 — 개발 일정을 산출할 수 없음" };
+    return { level: "caution", reason: "개발 일정 미정" + (ux ? ` (UX 일정 ${row[uxCol]})` : "") };
+  },
+
   // ── 관리 열 선택 창 (업로드 직후 · 설정에서 공용) ──
   // cols: 엑셀의 전체 열, managed: 현재 선택된 열, newCols: 이번에 새로 감지된 열
   columnPicker({ cols, managed, newCols = [], onSaved }) {

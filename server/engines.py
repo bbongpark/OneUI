@@ -190,10 +190,8 @@ def _mock(persona, payload):
             r = _seed("pl" + ft["feature_index"])
             di = [] if r.random() < 0.6 else ["'VOC건수' 미기입"]
             si = [] if r.random() < 0.7 else [{"slide": r.randint(1, 3), "issue": "우측 상단 표 빈칸"}]
-            risk = r.choices(["normal", "caution", "high", "unknown"], weights=[55, 22, 13, 10])[0]
             res.append({"feature_index": ft["feature_index"], "ready": not di and not si,
-                        "doc_issues": di, "slide_issues": si, "schedule_risk": risk,
-                        "risk_rationale": "(mock) 마일스톤 대비 자동 판정", "status": "ok", "reason": ""})
+                        "doc_issues": di, "slide_issues": si, "status": "ok", "reason": ""})
         return {"persona": "pl", "results": res}
     if persona == "persona-sw-director":
         res = []

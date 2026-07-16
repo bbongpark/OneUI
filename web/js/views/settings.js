@@ -12,13 +12,15 @@ App.register("settings", {
     const feats = (app.state.data?.features?.features) || [];
     const allCols = [...new Set(feats.slice(0, 100).flatMap(f => Object.keys(f.row || {})))];
     const noData = allCols.length === 0;
-    // 시스템이 반드시 알아야 하는 5가지 — 각각이 엑셀의 어느 열인지 지정한다
+    // 시스템이 알아야 하는 항목 — 각각이 엑셀의 어느 열인지 지정한다
     const ROLES = {
       feature_index: { label: "인덱스 번호", why: "Feature 식별 · PPT 슬라이드 매핑 기준" },
       feature_name: { label: "Feature 이름", why: "목록·회의 안건에 표시" },
       department: { label: "제안 부서", why: "회의 일정 배정 · 부서별 현황 기준" },
-      dev_status: { label: "개발 상태", why: "PL의 일정 리스크 판단 재료" },
-      change_summary: { label: "변경점", why: "PL의 템플릿 준수 검사 대상" }
+      dev_status: { label: "개발 상태", why: "Feature 진행 상태 표시" },
+      change_summary: { label: "변경점", why: "PL의 템플릿 준수 검사 대상" },
+      ux_schedule: { label: "UX 일정", why: "일정 리스크 판정 — 이게 있어야 개발 일정이 나온다", optional: true },
+      dev_schedule: { label: "개발 일정", why: "일정 리스크 판정 — DVR을 넘으면 리스크", optional: true }
     };
     const roleOf = c => Object.keys(ROLES).find(k => (schema.fields || {})[k] === c) || "";
     // 실제 데이터에서 예시 값 — 맞는 열을 골랐는지 눈으로 확인하는 용도
@@ -52,15 +54,16 @@ App.register("settings", {
             <label style="font-size:12px;color:var(--text-2)">헤더 행 <input type="number" id="sc-hdr" value="${schema.header_row || 1}" min="1" style="width:55px" ${dis}></label>
           </div>
 
-          <div style="font-weight:700;font-size:13px;margin-bottom:2px"><span class="step-num">1</span>필수 항목 연결</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:2px"><span class="step-num">1</span>항목 연결</div>
           <p style="font-size:12px;color:var(--text-2);margin:0 0 8px 27px">
-            시스템이 반드시 알아야 하는 5가지가 <b>엑셀의 어느 열인지</b> 골라주세요. 오른쪽 예시 값으로 맞게 골랐는지 확인할 수 있습니다.</p>
+            시스템이 알아야 하는 항목이 <b>엑셀의 어느 열인지</b> 골라주세요. 오른쪽 예시 값으로 맞게 골랐는지 확인할 수 있습니다.</p>
           <table class="tbl" style="margin-bottom:18px"><thead><tr>
             <th style="width:30%">시스템이 필요한 항목</th><th style="width:28%">엑셀의 열</th><th>이 열의 예시 값</th>
           </tr></thead><tbody>
             ${Object.entries(ROLES).map(([k, r]) => `<tr>
-              <td><b>${r.label}</b><div style="font-size:11px;color:var(--text-3);font-weight:400">${r.why}</div></td>
-              <td><select data-field="${k}" ${dis}><option value="">— 선택하세요 —</option>
+              <td><b>${r.label}</b>${r.optional ? ' <span class="badge b-outline">선택</span>' : ""}
+                <div style="font-size:11px;color:var(--text-3);font-weight:400">${r.why}</div></td>
+              <td><select data-field="${k}" ${dis}><option value="">${r.optional ? "— 사용 안 함 —" : "— 선택하세요 —"}</option>
                 ${allCols.map(c => `<option ${(schema.fields || {})[k] === c ? "selected" : ""}>${c}</option>`).join("")}</select></td>
               <td class="idx" data-sample="${k}" style="font-family:var(--mono);font-size:11.5px"></td>
             </tr>`).join("")}
@@ -252,7 +255,7 @@ App.register("settings", {
         if (!noData) {
           const fields = {};
           el.querySelectorAll("[data-field]").forEach(s => { if (s.value) fields[s.dataset.field] = s.value; });
-          const missing = Object.keys(ROLES).filter(k => !fields[k]);
+          const missing = Object.keys(ROLES).filter(k => !ROLES[k].optional && !fields[k]);
           if (missing.length) return app.toast("필수 항목 미연결: " + missing.map(k => ROLES[k].label).join(", "), true);
           const picked = attr => [...el.querySelectorAll(`[${attr}]`)].filter(c => c.checked).map(c => c.getAttribute(attr));
           const schemaNew = { ...schema, sheet_name: el.querySelector("#sc-sheet").value,

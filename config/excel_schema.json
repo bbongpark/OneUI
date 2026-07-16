@@ -7,7 +7,9 @@
   "feature_name": "Feature명",
   "department": "제안부서",
   "dev_status": "개발상태",
-  "change_summary": "변경점"
+  "change_summary": "변경점",
+  "ux_schedule": "UX일정",
+  "dev_schedule": "개발일정"
  },
  "_dev_done_rule_comment": "개발 완료 판정 규칙. mode=filled: column에 값이 있으면 완료 (예: CL 열에 CL 번호). mode=values: column의 값이 values 중 하나면 완료. pattern(선택): 정규식으로 값 형식 검증. '-', 'TBD' 등 자리채움 값은 빈 값으로 본다. 설정 화면에서 편집.",
  "dev_done_rule": {
@@ -21,6 +23,8 @@
   "제안부서",
   "개발상태",
   "CL",
+  "UX일정",
+  "개발일정",
   "적용모델",
   "변경점",
   "목표시나리오",

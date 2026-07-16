@@ -5,6 +5,7 @@ App.register("meetings", {
     const d = app.state.data, sched = d.schedule, feats = d.features.features;
     const fmap = Object.fromEntries(feats.map(f => [f.feature_index, f]));
     const readonly = d.features.readonly;
+    const admin = app.state.user.role === "admin";
     const stats = d.pred_stats.runs || [];
 
     el.innerHTML = `
@@ -36,11 +37,26 @@ App.register("meetings", {
           </div>
         </div>
         <div>
-          <div class="card" style="margin-bottom:14px"><div class="card-head">과제 마일스톤</div>
-            <div class="card-body">${(sched.milestones || []).map(m => `
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--border);font-size:12.5px">
-                <span>${m.name}</span><b style="font-family:var(--mono);font-size:12px">${m.date}</b></div>`).join("") || '<div class="empty">마일스톤 없음</div>'}
-              <p style="font-size:11px;color:var(--text-3);margin-top:8px">PL 검사의 일정 리스크 판단 기준. 관리자가 편집(뼈대: JSON 직접 수정).</p>
+          <div class="card" style="margin-bottom:14px"><div class="card-head">과제 일정
+            <span class="sub">DVR = 개발 일정 리스크 판정 기준일</span></div>
+            <div class="card-body">
+              <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px">
+                <b style="font-size:13px;color:var(--accent)">DVR</b>
+                ${readonly || !admin ? `<span style="font-family:var(--mono);font-size:13px">${sched.dvr || "미설정"}</span>`
+                  : `<input type="date" id="dvr-in" value="${sched.dvr || ""}" style="flex:1">
+                     <button class="btn small primary" id="dvr-save">저장</button>`}
+              </div>
+              <div id="ms-list">${(sched.milestones || []).map((m, i) => `
+                <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px dashed var(--border);font-size:12.5px">
+                  <span style="flex:1">${m.name}</span>
+                  <b style="font-family:var(--mono);font-size:12px">${m.date}</b>
+                  ${admin && !readonly ? `<button class="btn ghost small" data-msdel="${i}" style="padding:0 5px">✕</button>` : ""}
+                </div>`).join("") || '<div style="font-size:12px;color:var(--text-3);padding:4px 0">마일스톤 없음</div>'}</div>
+              ${admin && !readonly ? `<div style="display:flex;gap:6px;margin-top:8px">
+                <input id="ms-name" placeholder="마일스톤 이름" style="flex:1">
+                <input type="date" id="ms-date" style="width:140px">
+                <button class="btn small" id="ms-add">추가</button></div>` : ""}
+              <p style="font-size:11px;color:var(--text-3);margin-top:8px">개발 일정이 DVR을 넘으면 일정 리스크로 판정됩니다. 마일스톤은 PL 검사의 참고 자료입니다.</p>
             </div>
           </div>
           <div class="card"><div class="card-head">SW담당 예상 적중률</div>
@@ -206,5 +222,29 @@ App.register("meetings", {
       app.run("schedule", {});
     };
     el.querySelectorAll("[data-run]").forEach(b => b.onclick = () => app.run(b.dataset.run));
+
+    // ── 과제 일정: DVR + 마일스톤 ──
+    const savePlan = async payload => {
+      try {
+        await app.api("/api/schedule/plan", { version: app.state.version, user: app.state.user.name,
+          role: app.state.user.role, base_rev: sched.rev, ...payload });
+        app.toast("과제 일정이 저장되었습니다");
+        await app.reload(); app.route();
+      } catch (e) { app.toast(e.message, true); }
+    };
+    const dvrSave = el.querySelector("#dvr-save");
+    if (dvrSave) dvrSave.onclick = () => {
+      const v = el.querySelector("#dvr-in").value;
+      if (!v) return app.toast("DVR 날짜를 입력하세요", true);
+      savePlan({ dvr: v });
+    };
+    const msAdd = el.querySelector("#ms-add");
+    if (msAdd) msAdd.onclick = () => {
+      const name = el.querySelector("#ms-name").value.trim(), date = el.querySelector("#ms-date").value;
+      if (!name || !date) return app.toast("이름과 날짜를 입력하세요", true);
+      savePlan({ milestones: [...(sched.milestones || []), { name, date }].sort((a, b) => a.date.localeCompare(b.date)) });
+    };
+    el.querySelectorAll("[data-msdel]").forEach(b => b.onclick = () =>
+      savePlan({ milestones: (sched.milestones || []).filter((_, i) => i !== +b.dataset.msdel) }));
   }
 });

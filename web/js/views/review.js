@@ -54,7 +54,7 @@ App.register("review", {
         if (fd && f.department !== fd) return false;
         if (fs === "needs_human" && syn.status !== "needs_human") return false;
         if (fs === "notready" && (plc.ready !== false)) return false;
-        if (fs === "risk" && plc.schedule_risk !== "high") return false;
+        if (fs === "risk" && app.scheduleRisk(f).level !== "high") return false;
         if (fs === "divergent" && !syn.divergent) return false;
         if (fs === "rereg" && !f.reregistered_from) return false;
         if (fs === "decided" && f.status !== "decided") return false;
@@ -78,7 +78,7 @@ App.register("review", {
           <td>${app.recBadge(f.decision === "rejected" ? "rejected" : (f.decision || syn.final_recommendation))}</td>
           <td>${f.decision ? '<span class="badge b-outline" title="실제 결정 확정됨">확정</span>' : pred ? app.recBadge(pred.predicted_decision) + `<span style="font-size:10px;color:var(--text-3)"> ${pred.confidence}</span>` : '<span class="badge b-outline">—</span>'}</td>
           <td>${plc.ready === true ? '<span class="badge b-go">준비</span>' : plc.ready === false ? '<span class="badge b-nogo" title="' + [(plc.doc_issues || []).join(", "), (plc.slide_issues || []).map(x => "슬라이드" + x.slide + ": " + x.issue).join(", ")].filter(Boolean).join(" · ") + '">미준비</span>' : '<span class="badge b-outline">—</span>'}</td>
-          <td>${app.riskBadge(plc.schedule_risk)}</td>
+          <td>${(r => `<span class="badge b-risk-${r.level}" title="${r.reason}">${{ high: "높음", caution: "주의", normal: "정상", unknown: "미확인" }[r.level]}</span>`)(app.scheduleRisk(f))}</td>
           <td>${app.statusBadge(f.status)}</td>
           <td>${f.slides.length ? `<button class="btn ghost small" data-slides="${f.feature_index}" title="발표 자료 보기">🖼 ${f.slides.length}</button>` : ""}</td>
         </tr>`;
@@ -104,6 +104,8 @@ App.register("review", {
              ? app.state.boot.managed_columns : Object.keys(f.row))
             .filter(c => f.row[c] !== undefined)
             .map(c => `<dt title="관리 열">${c}</dt><dd style="font-size:12px">${f.row[c] || '<span style="color:var(--text-3)">미기재</span>'}</dd>`).join("")}
+          <dt>일정 리스크</dt><dd>${(r => `<span class="badge b-risk-${r.level}">${{ high: "높음", caution: "주의", normal: "정상", unknown: "미확인" }[r.level]}</span>
+            <span style="font-size:11.5px;color:var(--text-2)"> ${r.reason}</span>`)(app.scheduleRisk(f))}</dd>
           ${f.reregistered_from ? `<dt>재등록</dt><dd><span class="badge b-violet">${f.reregistered_from}에서 거절/보류 → 재등록</span></dd>` : ""}
           ${f.decision ? `<dt>임원 결정</dt><dd>${app.recBadge(f.decision === "rejected" ? "rejected" : f.decision)} ${(f.decision_conditions || []).join(", ")}</dd>` : ""}
         </div>

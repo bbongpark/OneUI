@@ -118,6 +118,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(api_schedule_move(b))
             if path == "/api/schedule/slot":
                 return self._json(api_schedule_slot(b))
+            if path == "/api/schedule/plan":
+                return self._json(api_schedule_plan(b))
             if path == "/api/schedule/est":
                 return self._json(api_schedule_est(b))
             if path == "/api/meetings/confirm":
@@ -162,6 +164,7 @@ def api_bootstrap():
     return {"versions": store.versions(), "users": users,
             "managed_columns": sc.get("managed_columns", []),
             "dev_done_rule": sc.get("dev_done_rule", {}),
+            "schema_fields": sc.get("fields", {}),
             "engine": {"default": eng.get("default_engine"), "names": list((eng.get("engines") or {}).keys())}}
 
 
@@ -247,6 +250,23 @@ def api_schedule_move(b):
         return obj
     obj = store.update(store.dpath(v, "schedule.json"), fn, base_rev=b.get("base_rev"))
     return {"ok": True, "rev": obj["rev"], "warning": obj.get("warning", "")}
+
+
+def api_schedule_plan(b):
+    """과제 일정 — DVR(개발 일정 리스크 판정 기준일)과 마일스톤. 관리자만."""
+    if b.get("role") != "admin":
+        raise RuntimeError("과제 일정 수정은 관리자만 가능합니다")
+    v = b["version"]
+    def fn(obj):
+        if "dvr" in b:
+            obj["dvr"] = b["dvr"]
+        if "milestones" in b:
+            obj["milestones"] = b["milestones"]
+        return obj
+    obj = store.update(store.dpath(v, "schedule.json"), fn,
+                       {"rev": 0, "milestones": [], "slots": []}, base_rev=b.get("base_rev"))
+    store.notify("job", "과제 일정 수정 (%s): DVR %s (%s)" % (v, obj.get("dvr") or "미설정", b.get("user", "?")))
+    return {"ok": True, "rev": obj["rev"]}
 
 
 def api_schedule_slot(b):
@@ -441,6 +461,11 @@ def api_ingest_upload(b):
     existing = store.load(store.dpath(version, "features.json"), None)
     if existing and existing.get("readonly"):
         raise RuntimeError("지난 버전은 읽기 전용입니다")
+    if b.get("dvr"):                      # 과제 입력 시 DVR 지정 (나중에 회의 화면에서 수정 가능)
+        def fn(obj):
+            obj["dvr"] = b["dvr"]
+            return obj
+        store.update(store.dpath(version, "schedule.json"), fn, {"rev": 0, "milestones": [], "slots": []})
     fname = os.path.basename(b.get("filename", ""))
     updir = store.dpath(version, "uploads")
     os.makedirs(updir, exist_ok=True)
