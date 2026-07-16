@@ -37,7 +37,7 @@ App.register("review", {
       </div>
       <div class="card"><div class="tbl-wrap" style="max-height:calc(100vh - 250px);overflow-y:auto">
         <table class="tbl"><thead><tr>
-          <th>인덱스</th><th>제목 <span style="font-weight:400;text-transform:none;color:var(--text-3)">(AI 요약)</span></th><th>기능명</th><th>등급</th><th>판정 근거</th><th>결정</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
+          <th>인덱스</th><th>기능명</th><th>제목 <span style="font-weight:400;text-transform:none;color:var(--text-3)">(AI 요약)</span></th><th>등급</th><th>판정 근거</th><th>결정</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
         </tr></thead><tbody id="rows"></tbody>
       </table></div></div>`;
 
@@ -86,8 +86,8 @@ App.register("review", {
         const pred = predMap[f.feature_index];
         return `<tr class="clickable" data-idx="${f.feature_index}">
           <td class="idx">${f.feature_index}${f.reregistered_from ? ` <span class="badge b-violet" title="이전 버전 ${f.reregistered_from}에서 미지원/보류된 건의 재등록">재등록</span>` : ""}${f.input_changed ? ` <span class="badge b-blue" title="리뷰 후 입력이 변경됨 — 재확인 필요">입력변경</span>` : ""}</td>
+          <td class="dept">${f.function_name}</td>
           <td class="name" title="${f.name}">${f.name}</td>
-          <td>${f.function_name}</td>
           <td>${app.gradeBadge(syn.final_grade)}</td>
           <td>${why}</td>
           <td>${f.decision ? app.recBadge(f.decision) : '<span class="badge b-outline">회의 전</span>'}</td>
