@@ -266,7 +266,8 @@ App.register("meetings", {
           cell(f, "dev_group"), cell(f, "group_lead"), cell(f, "dev_owner"),
           cell(f, "ep_owner"), cell(f, "ux_owner"), cell(f, "cxi_owner")]),
         tableAtEnd: true,
-        topDefault: `안녕하세요.\n${ds}(${dw}) ${s.time}에 One UI ${app.state.version} 리뷰 회의를 진행합니다. 아래 안건을 확인해 주세요.`,
+        draftKey: "meeting",
+        topDefault: `안녕하세요.\n리뷰 회의 일정을 안내드립니다. 회의 일시와 안건은 제목·아래 표를 확인해 주세요.`,
         botDefault: `발표 자료와 예상 질문 준비 부탁드립니다.\n감사합니다.`,
       });
     };

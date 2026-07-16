@@ -402,13 +402,19 @@ const App = {
     const tableHtml = this.mailTableHtml(o.cols, o.rows, o.wideCols || ["변경점"]);
     const tableBox = `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;background:#fff;overflow-x:auto">${tableHtml}</div>`;
     const tsv = [o.cols.join("\t"), ...o.rows.map(r => r.map(v => String(v == null ? "" : v).replace(/\s+/g, " ")).join("\t"))].join("\n");
-    const topLbl = `<div class="section-label" style="margin-top:14px">인사말 <span style="font-weight:400;text-transform:none">— 편집 가능</span></div>`;
-    const botLbl = `<div class="section-label" style="margin-top:12px">맺음말 <span style="font-weight:400;text-transform:none">— 편집 가능</span></div>`;
+    // 종류별(draftKey) 인사말/맺음말을 이 브라우저에 저장 — 한 번 다듬으면 다음 메일에도 유지된다.
+    const dk = o.draftKey ? "maildraft:" + o.draftKey : null;
+    const load = suf => (dk ? localStorage.getItem(dk + suf) : null);
+    const topInit = load(":top") != null ? load(":top") : o.topDefault;
+    const botInit = load(":bot") != null ? load(":bot") : o.botDefault;
+    const resetLink = suf => dk ? ` <a href="#" data-reset="${suf}" style="font-weight:400;font-size:11px;color:var(--accent)">기본 문구로</a>` : "";
+    const topLbl = `<div class="section-label" style="margin-top:14px">인사말 <span style="font-weight:400;text-transform:none">— 편집 가능 · 저장됨${resetLink("top")}</span></div>`;
+    const botLbl = `<div class="section-label" style="margin-top:12px">맺음말 <span style="font-weight:400;text-transform:none">— 편집 가능 · 저장됨${resetLink("bot")}</span></div>`;
     const tblLbl = `<div class="section-label" style="margin-top:12px">아이템 표 <span style="font-weight:400;text-transform:none">— 자동 (수정 불가)</span></div>`;
     const ta = (id, v) => `<textarea id="${id}" rows="2" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--border);border-radius:8px;resize:vertical">${e(v)}</textarea>`;
     const middle = o.tableAtEnd
-      ? `${topLbl}${ta("mail-top", o.topDefault)}${botLbl}${ta("mail-bot", o.botDefault)}${tblLbl}${tableBox}`
-      : `${topLbl}${ta("mail-top", o.topDefault)}${tblLbl}${tableBox}${botLbl}${ta("mail-bot", o.botDefault)}`;
+      ? `${topLbl}${ta("mail-top", topInit)}${botLbl}${ta("mail-bot", botInit)}${tblLbl}${tableBox}`
+      : `${topLbl}${ta("mail-top", topInit)}${tblLbl}${tableBox}${botLbl}${ta("mail-bot", botInit)}`;
 
     const wrap = this.el(`
       <div>
@@ -426,9 +432,23 @@ const App = {
         ${middle}
       </div>`);
 
+    const topEl = wrap.querySelector("#mail-top"), botEl = wrap.querySelector("#mail-bot");
+    if (dk) {
+      // 편집 즉시 저장 → 다음에 같은 종류 메일을 열면 이 문구가 뜬다
+      topEl.oninput = () => localStorage.setItem(dk + ":top", topEl.value);
+      botEl.oninput = () => localStorage.setItem(dk + ":bot", botEl.value);
+      wrap.querySelectorAll("[data-reset]").forEach(a => a.onclick = ev => {
+        ev.preventDefault();
+        const suf = a.dataset.reset;
+        const el = suf === "top" ? topEl : botEl;
+        el.value = suf === "top" ? o.topDefault : o.botDefault;
+        localStorage.removeItem(dk + ":" + suf);
+      });
+    }
+
     const flash = (btn, ok) => { const t = btn.textContent; btn.textContent = ok ? "복사됨" : "복사 실패"; setTimeout(() => btn.textContent = t, 1300); };
-    const topVal = () => wrap.querySelector("#mail-top").value;
-    const botVal = () => wrap.querySelector("#mail-bot").value;
+    const topVal = () => topEl.value;
+    const botVal = () => botEl.value;
     const para = s => `<p>${e(s).replace(/\n/g, "<br>")}</p>`;
     const buildHtml = () => o.tableAtEnd ? `${para(topVal())}${para(botVal())}${tableHtml}` : `${para(topVal())}${tableHtml}${para(botVal())}`;
     const buildPlain = () => o.tableAtEnd ? `${topVal()}\n\n${botVal()}\n\n${tsv}` : `${topVal()}\n\n${tsv}\n\n${botVal()}`;

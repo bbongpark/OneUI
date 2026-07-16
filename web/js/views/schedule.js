@@ -98,7 +98,8 @@ App.register("schedule", {
         rows: list.map(f => [f.feature_index, f.function_name || "",
           (changeCol ? cell(f, changeCol) : ""), cell(f, devCol), reasonOf(f)]),
         tableAtEnd: false,
-        topDefault: `안녕하세요.\n아래 기능들의 개발 일정이 ${dk}로 예정되어 있습니다. 일정 확인 및 준수 부탁드립니다.`,
+        draftKey: "schedule",
+        topDefault: `안녕하세요.\n아래 기능들의 개발 일정을 안내드립니다. 일정 확인 및 준수 부탁드립니다.`,
         botDefault: `일정 지연이 필요한 경우 지연사유를 회신 부탁드립니다.\n감사합니다.`,
       });
     };
