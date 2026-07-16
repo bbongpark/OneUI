@@ -161,6 +161,7 @@ def api_bootstrap():
     sc = store.load(store.path("config", "excel_schema.json"), {})
     return {"versions": store.versions(), "users": users,
             "managed_columns": sc.get("managed_columns", []),
+            "dev_status_done_values": sc.get("dev_status_done_values", []),
             "engine": {"default": eng.get("default_engine"), "names": list((eng.get("engines") or {}).keys())}}
 
 

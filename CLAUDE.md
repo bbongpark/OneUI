@@ -38,6 +38,7 @@ python scripts/gen_demo_data.py   # 데모 데이터 재생성 (실데이터 있
 4. **페르소나 출력 스키마 = 파서 계약** — prompts/의 JSON 필드명을 바꾸면 server/jobs.py 파서와 web/ 렌더러도 함께 바꿔야 한다.
 5. **캐시 3중 규칙** — 입력 해시(row_hash), 트리거 열(review_trigger_columns), 프롬프트 해시(prompt_hash_*). 재실행 로직을 건드릴 때 셋 다 고려.
 6. **의존성 제로 유지** — pip/npm 패키지 추가 금지. 표준 라이브러리와 바닐라 JS로 해결하라.
+7. **엑셀의 열 이름도 값도 하드코딩 금지** — 회사마다 어휘가 다르다(`구현완료` vs `Code Complete`). 열은 `fields`/`managed_columns`, 값은 `dev_status_done_values`처럼 **설정에서 읽고, 설정 UI는 실제 데이터의 값을 나열해 고르게** 만든다.
 
 ## 회사에서 해야 할 일 (우선순위 순)
 

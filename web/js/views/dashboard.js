@@ -6,7 +6,9 @@ App.register("dashboard", {
     const alive = feats.filter(f => f.decision !== "rejected");          // rejected = 모수 제외
     const rv = d.reviews.items, pl = d.pl_checks.items;
     const reviewed = alive.filter(f => rv[f.feature_index] && rv[f.feature_index].synthesis);
-    const devDone = alive.filter(f => ["검증완료", "구현완료"].includes(f.dev_status));
+    // 개발 완료 = 설정에서 지정한 "완료로 볼 상태 값" (엑셀마다 어휘가 다르므로 하드코딩 금지)
+    const doneVals = app.state.boot.dev_status_done_values || [];
+    const devDone = alive.filter(f => doneVals.includes(f.dev_status));
     const plChecked = alive.filter(f => pl[f.feature_index]);
     const plReady = plChecked.filter(f => pl[f.feature_index].ready);
     const riskHigh = alive.filter(f => (pl[f.feature_index] || {}).schedule_risk === "high");
@@ -58,7 +60,12 @@ App.register("dashboard", {
 
       <div class="grid kpi-grid" style="margin-bottom:14px">
         ${kpi("리뷰 진행률", reviewed.length, alive.length, { foot: `${reviewed.length} / ${alive.length}건`, drill: "all" })}
-        ${kpi("개발 완료 진행률", devDone.length, alive.length, { foot: `${devDone.length}건 구현/검증 완료`, color: "var(--good)", drill: "all" })}
+        ${doneVals.length
+          ? kpi("개발 완료 진행률", devDone.length, alive.length, { foot: `${devDone.length}건 · 완료 기준: ${doneVals.join(", ")}`, color: "var(--good)", drill: "all" })
+          : `<div class="kpi" data-drill="settings" title="설정에서 완료 기준을 지정하세요">
+               <div class="lbl"><span>개발 완료 진행률</span></div>
+               <div class="num" style="font-size:15px;color:var(--accent)">설정 필요</div>
+               <div class="foot">설정 → 개발 완료로 볼 상태 값 지정</div></div>`}
         ${kpi("PL 통과율", plReady.length, plChecked.length || 1, { foot: `미준비 ${plChecked.length - plReady.length}건`, color: "var(--serious)", drill: "notready" })}
         ${kpi("일정 리스크", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: "high 등급 건수", drill: "risk" })}
         ${kpi("사람 확인 필요", needsHuman.length, null, { cls: needsHuman.length ? "blue" : "", foot: "AI 판단 보류", drill: "needs_human" })}
@@ -109,7 +116,8 @@ App.register("dashboard", {
       ${(q.done || []).slice(0, 6).map(x => `<div style="font-size:12px;padding:3px 0;color:var(--text-2)">${x.ok ? "✅" : "❌"} ${x.label} <span style="color:var(--text-3)">${x.at.slice(11, 16)}</span></div>`).join("") || '<div style="color:var(--text-3);font-size:12px">기록 없음</div>'}`;
 
     el.querySelectorAll("[data-run]").forEach(b => b.onclick = () => app.run(b.dataset.run));
-    el.querySelectorAll("[data-drill]").forEach(k => k.onclick = () => { location.hash = "#/review?f=" + k.dataset.drill; });
+    el.querySelectorAll("[data-drill]").forEach(k => k.onclick = () =>
+      location.hash = k.dataset.drill === "settings" ? "#/settings" : "#/review?f=" + k.dataset.drill);
 
     // ── ① 인입 업로드 모달 ──
     el.querySelector("#ingest-btn").onclick = () => {

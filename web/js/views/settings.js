@@ -57,7 +57,10 @@ App.register("settings", {
               <td style="text-align:center"><input type="checkbox" data-trig="${c}" ${(schema.review_trigger_columns || []).includes(c) ? "checked" : ""} style="width:auto" ${dis}></td>
             </tr>`).join("")}
           </tbody></table></div>
-          <p style="font-size:11px;color:var(--text-3);margin-top:8px">관리 열만 AI 페르소나에 전달되고 리뷰 보드 상세에 표시됩니다. 목록을 바꾸려면 "관리 열 선택".</p>`}
+          <p style="font-size:11px;color:var(--text-3);margin-top:8px">관리 열만 AI 페르소나에 전달되고 리뷰 보드 상세에 표시됩니다. 목록을 바꾸려면 "관리 열 선택".</p>
+          <div class="section-label" style="display:flex;align-items:center;gap:8px">개발 완료로 볼 상태 값
+            <span style="font-weight:400;text-transform:none">— 현황판 "개발 완료 진행률" 집계 기준. 개발 상태 열의 실제 값에서 고르세요</span></div>
+          <div id="dv-box"></div>`}
         </div>
       </div>
 
@@ -113,10 +116,32 @@ App.register("settings", {
         if (h) h.onchange = () =>
           el.querySelectorAll(`[data-col-row]:not([style*="none"]) [${attr}]`).forEach(c => c.checked = h.checked);
       });
-      // 논리 필드 중복 방지
+      // 개발 완료로 볼 상태 값 — 개발 상태 열의 실제 값을 읽어 체크박스로
+      const drawDoneValues = () => {
+        const col = [...el.querySelectorAll("[data-role]")].find(s => s.value === "dev_status")?.dataset.role;
+        const box = el.querySelector("#dv-box");
+        if (!col) {
+          box.innerHTML = '<div style="font-size:12px;color:var(--serious)">개발 상태 열을 논리 필드에서 먼저 지정하세요.</div>';
+          return;
+        }
+        const vals = [...new Set(feats.map(f => (f.row || {})[col]).filter(v => v))].sort();
+        const done = schema.dev_status_done_values || [];
+        box.innerHTML = vals.length
+          ? `<div style="font-size:11.5px;color:var(--text-3);margin-bottom:4px">'${col}' 열의 값 ${vals.length}종</div>` +
+            vals.map(v => {
+              const n = feats.filter(f => (f.row || {})[col] === v).length;
+              return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;font-size:12.5px;cursor:pointer">
+                <input type="checkbox" data-dv="${v}" ${done.includes(v) ? "checked" : ""} style="width:auto" ${dis}>
+                ${v} <span style="color:var(--text-3);font-size:11px">${n}건</span></label>`;
+            }).join("")
+          : '<div style="font-size:12px;color:var(--text-3)">이 열에 값이 없습니다.</div>';
+      };
+      drawDoneValues();
+
+      // 논리 필드 중복 방지 + 개발 상태 열 변경 시 값 목록 갱신
       el.querySelectorAll("[data-role]").forEach(s => s.onchange = () => {
-        if (!s.value) return;
-        el.querySelectorAll("[data-role]").forEach(o => { if (o !== s && o.value === s.value) o.value = ""; });
+        if (s.value) el.querySelectorAll("[data-role]").forEach(o => { if (o !== s && o.value === s.value) o.value = ""; });
+        drawDoneValues();
       });
     }
 
@@ -153,7 +178,8 @@ App.register("settings", {
           const picked = attr => [...el.querySelectorAll(`[${attr}]`)].filter(c => c.checked).map(c => c.getAttribute(attr));
           const schemaNew = { ...schema, sheet_name: el.querySelector("#sc-sheet").value,
             header_row: +el.querySelector("#sc-hdr").value, fields,
-            required_columns: picked("data-req"), review_trigger_columns: picked("data-trig") };
+            required_columns: picked("data-req"), review_trigger_columns: picked("data-trig"),
+            dev_status_done_values: picked("data-dv") };
           await app.api("/api/config/excel_schema", { ...auth, data: schemaNew });
         }
         el.querySelector("#s-msg").textContent = "저장됨 · " + new Date().toLocaleTimeString();

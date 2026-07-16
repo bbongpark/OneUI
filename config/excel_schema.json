@@ -9,6 +9,11 @@
   "dev_status": "개발상태",
   "change_summary": "변경점"
  },
+ "_dev_status_done_comment": "개발상태 열의 값 중 '개발 완료'로 집계할 값들. 설정 화면에서 실제 엑셀의 값을 보고 고른다.",
+ "dev_status_done_values": [
+  "구현완료",
+  "검증완료"
+ ],
  "managed_columns": [
   "Feature명",
   "제안부서",
