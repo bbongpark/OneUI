@@ -33,7 +33,21 @@ def run(persona, prompt_text, payload, attachments=None):
         return _spawn(name, ecfg, persona, prompt_text, payload, attachments)
     if etype == "persistent":
         return _persistent(name, ecfg, persona, prompt_text, payload, attachments)
+    if etype == "custom":
+        return _custom(name, persona, prompt_text, payload, attachments)
     raise RuntimeError("unknown engine type: " + etype)
+
+
+def _custom(name, persona, prompt_text, payload, attachments):
+    """드롭인 어댑터에 위임 — adapters/engine_<name>.py(없으면 engine.py)의 run()."""
+    import adapters
+    mod = adapters.load_engine(name)
+    if mod is None or not hasattr(mod, "run"):
+        raise RuntimeError("custom 엔진 '%s' 어댑터 없음 — adapters/engine_%s.py를 만들고 run()을 구현하세요" % (name, name))
+    result = mod.run(persona, prompt_text, payload, attachments)
+    store.record_usage(name, persona, len(prompt_text) // 3,
+                       len(json.dumps(result, ensure_ascii=False)) // 3, 0.0)
+    return result
 
 
 def selftest():

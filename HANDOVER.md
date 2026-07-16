@@ -48,7 +48,8 @@ python server.py                     # → http://localhost:8765
    }
    ```
    - `{prompt_file}`은 서버가 임시 파일 경로로 치환한다.
-   - 이미지 첨부(PL 검사용)는 명령 뒤에 파일 경로들이 추가로 붙는다 → 이 규약이 다르면 `server/engines.py`의 `_spawn()` 수정.
+   - 이미지 첨부(PL 검사용)는 명령 뒤에 파일 경로들이 추가로 붙는다.
+   - **`spawn`/`persistent`로 안 되는 특수 연결**(별도 인증·비표준 프로토콜·응답 후처리)이면 코어를 고치지 말고 `adapters/engine_example.py`를 `adapters/engine_<name>.py`로 복사해 `run()`을 채우고, `config/engines.json`에서 그 엔진 `type`을 `"custom"`으로 둔다 (→ `adapters/README.md`).
 4. 자가진단 전 항목 통과를 확인한 뒤 다음 단계로.
 
 > **왜 중요한가**: 이 단계가 끝나야 나머지 모든 검증이 진짜 결과로 이뤄진다. mock 상태로 골든셋을 돌리면 무작위 값이 나와 일치율 0%가 정상이다.
@@ -162,17 +163,14 @@ python server.py                     # → http://localhost:8765
 
 ---
 
-## 6. PLM API 연동 (개발 필요)
+## 6. PLM API 연동 (드롭인 어댑터)
 
-현재는 mock이다. 교체 지점:
+**코어를 수정하지 않는다.** `adapters/plm_example.py`를 **`adapters/plm.py`로 복사**하고 `advance(action)`만 실제 PLM 호출로 채우면 끝 — `server/api.py`가 파일이 있으면 자동 위임하고, 없으면 mock(pending→sent→in_progress→done)으로 동작한다. (상세: `adapters/README.md`)
 
-| 위치 | 현재 | 교체 후 |
-|---|---|---|
-| `server/api.py` → `api_plm_advance()` | 상태를 pending→sent→in_progress→done으로 수동 진행 | 실제 PLM API 호출 (액션 아이템 전송 / 상태 폴링) |
-
+- `advance(action)` 반환: 바꿀 상태만 `{"plm_status": "sent|in_progress|done", "plm_id": "..."}`
 - 액션 아이템 구조: `{id, feature_index, action, owner_dept, due, plm_status, plm_id, report_needed, followup_scheduled}`
 - `plm_status`는 `pending|sent|in_progress|done` 4단계 유지 (화면·판단 로직이 이 값에 의존)
-- 인터페이스만 지키면 나머지(보고 필요 판단 → 후속 보고 배정 → 회의 재진입)는 그대로 동작한다.
+- 표준 라이브러리만(urllib 등), API 키·엔드포인트는 환경변수/config에서 읽을 것.
 - 폴링이 필요하면 `server/jobs.py`에 주기 작업을 추가하거나 Windows 작업 스케줄러에서 API를 호출.
 
 ---

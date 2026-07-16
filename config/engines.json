@@ -1,5 +1,5 @@
 {
- "_comment": "default_engine: mock(데모) | gemini | claude. 회사에서 gemini로 전환 후 엔진 자가진단 실행할 것.",
+ "_comment": "default_engine: mock(데모) | gemini | claude. 회사에서 gemini로 전환 후 엔진 자가진단 실행할 것. type은 mock/spawn/persistent/custom — custom은 adapters/engine_<name>.py에 위임(특수 연결용, adapters/README.md).",
  "default_engine": "mock",
  "engines": {
   "mock": {

@@ -58,6 +58,7 @@
 | `web/js/app.js` | 프론트 셸: 라우터, 폴링, 공통 컴포넌트(모달·토스트·배지·슬라이드 뷰어), 공개 헬퍼. |
 | `web/js/views/*.js` | 화면 1개 = 파일 1개. `App.register("route", {title, render})`. |
 | `web/css/app.css` | 전역 스타일. |
+| `adapters/` | **드롭인 어댑터** — 코어 수정 없이 파일 추가만으로 PLM·CLI 엔진을 실제 연결. `plm.py`/`engine_<name>.py`가 있으면 코어가 위임, 없으면 mock. `*_example.py`는 템플릿. (`adapters/README.md`) |
 | `scripts/*.ps1` | PowerShell: 엑셀 변환, PPT→PNG 렌더, 보고 PPT 채우기, 백업. Office 필요. |
 | `templates/` | 보고 PPT 템플릿, 골든셋 양식, 변경점 템플릿. |
 | `data/<버전>/` | 모든 상태 (git 미추적). |
@@ -228,7 +229,8 @@
 - **새 페르소나 추가**: `prompts/`에 md 생성 → `jobs.py`에 `job_*` 함수 + `KIND_LABEL`/`HANDLERS` 등록 → 출력 스키마 파서 + 뷰 렌더 → 화면에 실행 버튼. mock도 `_mock()`에 분기 추가.
 - **새 알림 유형**: `store.notify(type, text)` 호출 + `notifications.js`의 ICONS/TYPES에 한 줄.
 - **새 화면**: `web/js/views/`에 파일 + `App.register(...)` + `index.html`에 script 태그 + 네비 등록.
-- **엔진 교체/추가**: `engines.py`의 타입 분기 + `config/engines.json`. 계약(`run`)만 지키면 파이프라인 무변경.
+- **엔진 교체/추가**: 보통 `config/engines.json`의 `command`만(spawn/persistent). 특수 연결은 `adapters/engine_<name>.py`의 `run()` + config `type:"custom"` — 코어 무수정.
+- **PLM·외부 시스템 연결**: `adapters/plm.py`의 `advance()` 드롭인. 코어(`api_plm_advance`)가 있으면 위임, 없으면 mock. 새 외부 연동도 이 패턴(어댑터 로더 `adapters/__init__.py`)을 따른다.
 
 ---
 

@@ -388,18 +388,26 @@ def api_meetings_confirm(b):
 
 
 def api_plm_advance(b):
-    """PLM mock: pending→sent→in_progress→done 진행. [회사 작업] 실제 PLM API 어댑터로 교체."""
+    """PLM 진행. adapters/plm.py가 있으면 실제 PLM에 위임, 없으면 pending→sent→in_progress→done mock."""
+    import adapters
+    plm = adapters.load_plm()
     v = b["version"]
     order = ["pending", "sent", "in_progress", "done"]
     def fn(obj):
         for a in obj["items"]:
             if b.get("action_id") and a["id"] != b["action_id"]:
                 continue
-            i = order.index(a["plm_status"]) if a["plm_status"] in order else 0
-            if i < 3:
-                a["plm_status"] = order[i + 1]
-                if a["plm_status"] == "sent" and not a["plm_id"]:
-                    a["plm_id"] = "PLM-%s-%s" % (store.now()[:10].replace("-", ""), a["id"])
+            if plm is not None and hasattr(plm, "advance"):
+                upd = plm.advance(a) or {}                     # 실제 PLM 어댑터
+                for k in ("plm_status", "plm_id"):
+                    if k in upd:
+                        a[k] = upd[k]
+            else:
+                i = order.index(a["plm_status"]) if a["plm_status"] in order else 0   # mock 폴백
+                if i < 3:
+                    a["plm_status"] = order[i + 1]
+                    if a["plm_status"] == "sent" and not a["plm_id"]:
+                        a["plm_id"] = "PLM-%s-%s" % (store.now()[:10].replace("-", ""), a["id"])
         return obj
     store.update(store.dpath(v, "actions.json"), fn, base_rev=b.get("base_rev"))
     return {"ok": True}
