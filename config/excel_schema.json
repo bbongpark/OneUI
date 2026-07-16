@@ -21,6 +21,7 @@
  "managed_columns": [
   "Feature명",
   "제안부서",
+  "변경유형",
   "개발상태",
   "CL",
   "UX일정",

@@ -28,6 +28,7 @@ python scripts/gen_demo_data.py   # 데모 데이터 재생성 (실데이터 있
 | `web/js/views/*.js` | 화면 1개 = 파일 1개. 새 화면은 App.register("route", {title, render}) 복제 |
 | `prompts/*.md` | 페르소나 = 파일. `_common.md`이 모든 호출 앞에 주입됨 |
 | `config/excel_schema.json` | 논리 필드↔실제 엑셀 열 매핑 — 설정 화면에서 인입된 열 기반 선택 박스로 편집. **열 이름을 코드에 하드코딩하지 마라** |
+| `config/grade_rules.json` → `server/grading.py` | 등급 하드룰 — 자료 보완 필요(DOC)·단순 공유(SHARE)를 AI보다 먼저 판정. 걸린 건은 AI 호출 안 함 |
 | `data/<버전>/` | 모든 상태. features/reviews/pl_checks/schedule/meetings/actions.json |
 
 ## 불변 규칙 (수정 시 지킬 것)

@@ -68,10 +68,12 @@ App.register("review", {
       rows.innerHTML = list.map(f => {
         const it = rv[f.feature_index] || {}, syn = it.synthesis || {}, plc = pl[f.feature_index] || {};
         const per = it.personas || {};
-        // 부문별 등급 — 각 부문이 이 건을 어떤 비중으로 봤는지
-        const perHtml = Object.keys(P_LBL).map(k => per[k]
-          ? `<span class="badge ${(App.GRADES[per[k].grade] || {}).cls || "b-outline"}" title="${P_LBL[k]}: ${(App.GRADES[per[k].grade] || {}).full || ""} — ${per[k].rationale}">${P_LBL[k]} ${(App.GRADES[per[k].grade] || {}).label || "?"}</span>`
-          : `<span class="badge b-outline">${P_LBL[k]}</span>`).join(" ");
+        // 부문별 등급 — 각 부문이 이 건을 어떤 비중으로 봤는지. 하드룰 확정 건은 AI를 안 부른다
+        const perHtml = it.hard_rule
+          ? `<span class="badge ${(App.GRADES[it.hard_rule.grade] || {}).cls}" title="규칙으로 확정: ${it.hard_rule.reason}">⚙ 규칙 확정</span>`
+          : Object.keys(P_LBL).map(k => per[k]
+              ? `<span class="badge ${(App.GRADES[per[k].grade] || {}).cls || "b-outline"}" title="${P_LBL[k]}: ${(App.GRADES[per[k].grade] || {}).full || ""} — ${per[k].rationale}">${P_LBL[k]} ${(App.GRADES[per[k].grade] || {}).label || "?"}</span>`
+              : `<span class="badge b-outline">${P_LBL[k]}</span>`).join(" ");
         const pred = predMap[f.feature_index];
         return `<tr class="clickable" data-idx="${f.feature_index}">
           <td class="idx">${f.feature_index}${f.reregistered_from ? ` <span class="badge b-violet" title="이전 버전 ${f.reregistered_from}에서 거절/보류된 건의 재등록">재등록</span>` : ""}${f.input_changed ? ` <span class="badge b-blue" title="리뷰 후 입력이 변경됨 — 재확인 필요">입력변경</span>` : ""}</td>
@@ -113,9 +115,13 @@ App.register("review", {
           ${f.reregistered_from ? `<dt>재등록</dt><dd><span class="badge b-violet">${f.reregistered_from}에서 거절/보류 → 재등록</span></dd>` : ""}
           ${f.decision ? `<dt>임원 결정</dt><dd>${app.recBadge(f.decision === "rejected" ? "rejected" : f.decision)} ${(f.decision_conditions || []).join(", ")}</dd>` : ""}
         </div>
+        ${it.hard_rule ? `<div class="section-label">규칙 확정</div>
+          <div class="info-banner">⚙ <b>${(App.GRADES[it.hard_rule.grade] || {}).full}</b> — ${it.hard_rule.reason}
+            <div style="font-size:11px;margin-top:3px">하드룰로 확정된 건이라 AI 페르소나를 호출하지 않았습니다 (설정: config/grade_rules.json)</div></div>` : ""}
         <div class="section-label">부문별 등급</div>
         <div class="persona-scores">
-          ${Object.entries({ experience_planning: "경험기획", ux: "UX", dev: "개발", cxi: "CXI" }).map(([k, lbl]) => per[k] ? `
+          ${it.hard_rule ? '<div class="pscore" style="grid-column:1/-1"><div class="rat">규칙으로 확정되어 AI 판정 없음</div></div>' :
+            Object.entries({ experience_planning: "경험기획", ux: "UX", dev: "개발", cxi: "CXI" }).map(([k, lbl]) => per[k] ? `
             <div class="pscore"><div class="ph"><span>${lbl}</span><span>${app.gradeBadge(per[k].grade)}</span></div>
             <div class="rat">${per[k].rationale}</div>
             ${per[k].key_question ? `<div class="rat" style="color:var(--accent)">Q. ${per[k].key_question}</div>` : ""}</div>` :

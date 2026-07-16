@@ -35,9 +35,10 @@ NAMES = [
 ]
 STATUS_POOL = ["기획완료", "설계중", "구현중", "구현완료", "검증중", "검증완료"]
 MODELS = ["전 모델", "플래그십", "폴더블", "플래그십+폴더블"]
-GRADES = ["P0", "P1", "P2", "SHARE", "DOC"]     # 리뷰 등급 5단계
-G_ORDER = {g: i for i, g in enumerate(["DOC", "P0", "P1", "P2", "SHARE"])}
+AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰)
+G_ORDER = {g: i for i, g in enumerate(AI_GRADES)}
 RECS = ["go", "conditional_go", "defer", "no_go"]   # 회의 결정용
+CHANGE_TYPES = ["기능 추가", "동작 변경", "UI 개선", "문구 수정", "오타 수정", "성능 개선"]
 PERSONAS = ["experience_planning", "ux", "dev", "cxi"]
 P_LABEL = {"experience_planning": "경험기획", "ux": "UX", "dev": "개발", "cxi": "CXI"}
 
@@ -66,13 +67,18 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         ux_d = None if random.random() < 0.12 else datetime.date(2026, 7, random.randint(20, 31))
         dev_d = None if (ux_d is None or random.random() < 0.15) else \
             ux_d + datetime.timedelta(days=random.randint(14, 55))
+        # 변경점: 대부분 템플릿을 지키지만 일부는 부실 → 하드룰이 '자료 보완 필요'로 판정
+        ctype = random.choice(CHANGE_TYPES)
+        bad = random.random() < 0.12
+        change = random.choice(["개선함", "수정", "-", "TBD"]) if bad else \
+            f"[변경 전] 기존 {name.split()[0]} 동작 유지 → [변경 후] {name} 적용. 사유: 사용성 개선 및 VOC 대응. 영향: {dept} 모듈."
         row = {
-            "인덱스": idx, "Feature명": name, "제안부서": dept,
+            "인덱스": idx, "Feature명": name, "제안부서": dept, "변경유형": ctype,
             "개발상태": dev_st, "CL": cl,
             "UX일정": ux_d.isoformat() if ux_d else "",
             "개발일정": dev_d.isoformat() if dev_d else "",
             "적용모델": random.choice(MODELS),
-            "변경점": f"[변경 전] 기존 {name.split()[0]} 동작 유지 → [변경 후] {name} 적용. 사유: 사용성 개선 및 VOC 대응. 영향: {dept} 모듈.",
+            "변경점": change,
             "목표시나리오": f"{dept} 사용 빈도 상위 시나리오 개선",
             "VOC건수": random.choice(["", str(random.randint(20, 4200))]),
         }
@@ -98,16 +104,13 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             done = PERSONAS if st_reviewed else PERSONAS[: random.randint(1, 3)]
             pr = {}
             for p in done:
-                g = random.choices(GRADES, weights=[12, 34, 30, 16, 8])[0]
+                g = random.choices(AI_GRADES, weights=[18, 45, 37])[0]
                 pr[p] = {"grade": g, "rationale": random.choice(RATIONALES[p]),
                          "key_question": random.choice(KEYQ), "status": "ok"}
             entry = {"personas": pr, "prompt_hash": "a1b2c3", "input_hash": h(idx + "in")}
             if st_reviewed:
                 grades = [v["grade"] for v in pr.values()]
-                # 우선순위: DOC > P0 > P1 > P2 > SHARE (SHARE는 만장일치일 때만)
-                fg = min(grades, key=lambda g: G_ORDER[g])
-                if fg == "SHARE" and not all(g == "SHARE" for g in grades):
-                    fg = "P2"
+                fg = min(grades, key=lambda g: G_ORDER[g])          # P0 > P1 > P2
                 spread = max(G_ORDER[g] for g in grades) - min(G_ORDER[g] for g in grades)
                 div = spread >= 2
                 needs_h = div and random.random() < 0.15

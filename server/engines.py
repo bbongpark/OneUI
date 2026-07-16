@@ -144,8 +144,8 @@ def _extract_json(text):
 
 # ---------- mock 엔진 ----------
 
-GRADES = ["P0", "P1", "P2", "SHARE", "DOC"]     # 리뷰 등급 5단계
-GRADE_ORDER = {g: i for i, g in enumerate(["DOC", "P0", "P1", "P2", "SHARE"])}   # 종합 우선순위
+AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰이 먼저 판정)
+GRADE_ORDER = {g: i for i, g in enumerate(AI_GRADES)}
 RECS = ["go", "conditional_go", "defer", "no_go"]   # 회의 결정·예상 판정용 (리뷰 산출물 아님)
 
 
@@ -160,7 +160,7 @@ def _mock(persona, payload):
         for ft in feats:
             r = _seed(persona + ft["feature_index"])
             res.append({"feature_index": ft["feature_index"],
-                        "grade": r.choices(GRADES, weights=[12, 34, 30, 16, 8])[0],
+                        "grade": r.choices(AI_GRADES, weights=[18, 45, 37])[0],
                         "status": "ok", "reason": "",
                         "rationale": "(mock) %s 관점 자동 분류 — 실제 엔진 연결 시 교체됨" % persona,
                         "key_question": r.choice(["폴더블 시나리오 검증 여부?", "VOC 집계 기간?", ""])})
@@ -170,10 +170,7 @@ def _mock(persona, payload):
         for ft in feats:
             pr = ft.get("personas", {})
             grades = [v["grade"] for v in pr.values()] or ["P1"]
-            # 우선순위: DOC > P0 > P1 > P2 > SHARE (SHARE는 만장일치일 때만)
-            fg = min(grades, key=lambda g: GRADE_ORDER.get(g, 9))
-            if fg == "SHARE" and not all(g == "SHARE" for g in grades):
-                fg = "P2"
+            fg = min(grades, key=lambda g: GRADE_ORDER.get(g, 9))    # P0 > P1 > P2
             spread = max(GRADE_ORDER.get(g, 9) for g in grades) - min(GRADE_ORDER.get(g, 9) for g in grades)
             div = spread >= 2
             r = _seed("syn" + ft["feature_index"])

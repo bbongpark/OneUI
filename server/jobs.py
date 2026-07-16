@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """작업 큐 — 모든 AI 작업을 직렬 실행. 질의는 전용 슬롯(즉시 실행)."""
-import threading, queue, traceback, json, os, hashlib
-from . import store, engines
+import threading, queue, traceback, json, os, hashlib, re
+from . import store, engines, grading
 
 _q = queue.Queue()
 _state = {"current": None, "log": [], "done": []}
@@ -93,14 +93,41 @@ def _batches(items, version):
 # ---------- 파이프라인 작업들 ----------
 
 def job_review(job):
-    """개별 페르소나 4종 리뷰 — 캐시(입력 해시+프롬프트 해시) 존중, 변경분만."""
+    """등급 판정: ① 하드룰(자료 보완·단순 공유) → ② 나머지만 AI 페르소나가 P0/P1/P2.
+    캐시(입력 해시+프롬프트 해시) 존중, 변경분만 실행."""
     v = job["version"]
     feats = _features(v)["features"]
     rv_fp = store.dpath(v, "reviews.json")
     personas = ["persona-experience-planning", "persona-ux", "persona-dev", "persona-cxi"]
     only = job["params"].get("personas") or personas
     reviews = store.load(rv_fp, {"rev": 0, "items": {}})
-    targets = [f for f in feats if f["status"] != "decided" and f.get("decision") != "rejected"]
+    alive = [f for f in feats if f["status"] != "decided" and f.get("decision") != "rejected"]
+
+    # ① 하드룰 — 걸린 건은 AI를 호출하지 않는다 (판정 확정 + 토큰 절약)
+    hard = {}
+    for f in alive:
+        g, why = grading.hard_grade(f["row"])
+        if g:
+            hard[f["feature_index"]] = (g, why)
+    if hard:
+        def apply_hard(obj):
+            for idx, (g, why) in hard.items():
+                it = obj["items"].setdefault(idx, {"personas": {}})
+                it["hard_rule"] = {"grade": g, "reason": why}
+                it["personas"] = {}                       # AI 판정은 없다
+                it["synthesis"] = {"feature_index": idx, "final_grade": g, "divergent": False,
+                                   "divergent_summary": "", "rationale": "하드룰: " + why,
+                                   "meeting_questions": [], "status": "ok", "reason": "", "by_rule": True}
+                ft = next(x for x in alive if x["feature_index"] == idx)
+                it["input_hash"] = ft["row_hash"]
+            return obj
+        reviews = store.update(rv_fp, apply_hard, {"rev": 0, "items": {}})
+        n_doc = sum(1 for g, _ in hard.values() if g == "DOC")
+        n_share = len(hard) - n_doc
+        log("하드룰 확정: 자료 보완 %d건 · 단순 공유 %d건 (AI 호출 제외)" % (n_doc, n_share))
+
+    # ② 나머지만 AI가 P0/P1/P2 판정
+    targets = [f for f in alive if f["feature_index"] not in hard]
     for pname in only:
         key = pname.replace("persona-", "").replace("experience-planning", "experience_planning")
         ph = _prompt_hash(pname)
@@ -126,15 +153,19 @@ def job_review(job):
                     it["prompt_hash_" + key] = ph
                 return obj
             reviews = store.update(rv_fp, apply, {"rev": 0, "items": {}})
-    # 상태 갱신
+    # 상태 갱신 (하드룰 확정 건은 바로 회의 대기)
     def fst(obj):
         for f in obj["features"]:
             it = reviews["items"].get(f["feature_index"], {})
             if f["status"] in ("ingested", "reviewing"):
-                f["status"] = "reviewing" if len(it.get("personas", {})) < 4 else f["status"]
+                if it.get("hard_rule"):
+                    f["status"] = "meeting_wait"
+                elif len(it.get("personas", {})) < 4:
+                    f["status"] = "reviewing"
         return obj
     store.update(store.dpath(v, "features.json"), fst)
-    store.notify("job", "개별 페르소나 리뷰 완료 (%s)" % v)
+    store.notify("job", "리뷰 완료 (%s) — AI 판정 %d건%s" %
+                 (v, len(targets), " · 하드룰 확정 %d건" % len(hard) if hard else ""))
     enqueue("synthesis", v, job["user"])
 
 
@@ -143,7 +174,9 @@ def job_synthesis(job):
     rv_fp = store.dpath(v, "reviews.json")
     reviews = store.load(rv_fp, {"rev": 0, "items": {}})
     feats = _features(v)["features"]
+    # 하드룰로 확정된 건은 종합에서 제외 (이미 등급이 정해졌다)
     ready = [f for f in feats if len(reviews["items"].get(f["feature_index"], {}).get("personas", {})) == 4
+             and not reviews["items"].get(f["feature_index"], {}).get("hard_rule")
              and f.get("decision") != "rejected"]
     for batch in _batches(ready, v):
         payload = {"features": [{"feature_index": f["feature_index"],
