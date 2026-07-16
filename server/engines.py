@@ -197,6 +197,17 @@ def _mock(persona, payload):
                         "rationale": "(mock) 판단 성향 기반 예측", "anticipated_questions": [r.choice(["일정 내 검증 가능한가?", "커뮤니티 반발 시나리오는?", "VOC 수치 근거는?"])],
                         "status": "ok", "reason": ""})
         return {"persona": "sw_director", "results": res}
+    if persona == "aux-title":
+        res = []
+        for ft in feats:
+            raw = str(ft.get("change_summary", "")).strip()
+            # (mock) 변경점의 '[변경 후]' 뒤를 잘라 제목처럼 만든다 — 실제 엔진 연결 시 교체됨
+            t = ""
+            if raw:
+                m = re.search(r"\[변경 후\]\s*([^.·\n]{4,40})", raw)
+                t = (m.group(1) if m else raw[:24]).strip(" .·")
+            res.append({"feature_index": ft["feature_index"], "title": t})
+        return {"results": res}
     if persona == "aux-minutes-extract":
         return _mock_minutes(payload.get("minutes", ""), feats)
     if persona == "aux-duration-estimate":

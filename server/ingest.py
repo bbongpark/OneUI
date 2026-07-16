@@ -18,14 +18,14 @@ def _hash(row):
 
 
 def _prev_dropped(exclude_version):
-    """다른 버전들의 rejected/defer 항목: {feature명: '버전/인덱스'}"""
+    """다른 버전들의 rejected/defer 항목: {인덱스: '버전/인덱스'} — 같은 인덱스로 재등록을 감지한다."""
     out = {}
     for v in store.versions():
         if v == exclude_version:
             continue
         for f in store.load(store.dpath(v, "features.json"), {"features": []})["features"]:
             if f.get("decision") in ("rejected", "defer"):
-                out.setdefault(f["name"], "%s/%s" % (v, f["feature_index"]))
+                out.setdefault(f["feature_index"], "%s/%s" % (v, f["feature_index"]))
     return out
 
 
@@ -51,22 +51,23 @@ def ingest_excel(version, xlsx_path):
             continue
         h = _hash(r)
         pf = prev.get(idx)
+        func = r.get(fields.get("function_name", ""), "")
+        cat = r.get(fields.get("ai_category", ""), "")
         if pf is None:
             n_new += 1
             feats.append({
-                "feature_index": idx, "name": r.get(fields.get("feature_name", ""), idx),
-                "department": r.get(fields.get("department", ""), ""),
-                "dev_status": r.get(fields.get("dev_status", ""), ""),
+                "feature_index": idx,
+                "name": "",                     # Feature 이름 열이 없다 — AI가 변경점을 요약해 채운다
+                "function_name": func, "ai_category": cat,
                 "row": r, "row_hash": h, "status": "ingested", "decision": None,
                 "decision_conditions": [], "slides": [],
-                "reregistered_from": dropped.get(r.get(fields.get("feature_name", ""), "")),
+                "reregistered_from": dropped.get(idx),
                 "input_changed": False})
         else:
             trig_changed = any((pf["row"].get(c, "") != r.get(c, "")) for c in trig) if trig else (pf["row_hash"] != h)
-            pf = dict(pf, row=r,
-                      name=r.get(fields.get("feature_name", ""), pf["name"]),
-                      department=r.get(fields.get("department", ""), pf["department"]),
-                      dev_status=r.get(fields.get("dev_status", ""), pf["dev_status"]))
+            pf = dict(pf, row=r, function_name=func, ai_category=cat)
+            if trig_changed:
+                pf["name"] = ""                 # 변경점이 바뀌었으면 제목도 다시 만든다
             if trig_changed:
                 n_changed += 1
                 pf["row_hash"] = h          # 해시 변경 → 리뷰 캐시 무효화

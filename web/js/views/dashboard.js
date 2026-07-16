@@ -95,7 +95,7 @@ App.register("dashboard", {
             <div class="legend">
               ${gdist.map(x => `<span data-drill="g:${x.g}" style="cursor:pointer"><span class="sw" style="background:${x.color}"></span>${x.full} <b>${x.n}</b></span>`).join("")}
             </div>
-            <div class="section-label">부서별 리뷰 현황</div>
+            <div class="section-label">기능명별 리뷰 현황</div>
             <div id="dept-bars"></div>` : `<div class="empty">아직 종합 판정이 없습니다 — 리뷰를 실행하세요</div>`}
           </div>
         </div>
@@ -104,14 +104,14 @@ App.register("dashboard", {
         </div>
       </div>`;
 
-    // 부서별 막대
-    const depts = [...new Set(alive.map(f => f.department))];
+    // 기능명별 막대
+    const funcs = [...new Set(alive.map(f => f.function_name))].filter(Boolean).sort();
     const db = el.querySelector("#dept-bars");
-    if (db) db.innerHTML = depts.map(dept => {
-      const tot = alive.filter(f => f.department === dept).length;
-      const done = reviewed.filter(f => f.department === dept).length;
+    if (db) db.innerHTML = funcs.map(fn => {
+      const tot = alive.filter(f => f.function_name === fn).length;
+      const done = reviewed.filter(f => f.function_name === fn).length;
       return `<div style="display:flex;align-items:center;gap:10px;margin:5px 0;font-size:12px">
-        <span style="width:86px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dept}</span>
+        <span style="width:86px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fn}</span>
         <div style="flex:1;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden"><i style="display:block;height:100%;width:${pct(done, tot)}%;background:var(--accent);border-radius:4px"></i></div>
         <span style="width:52px;text-align:right;color:var(--text-3)">${done}/${tot}</span></div>`;
     }).join("");

@@ -38,8 +38,8 @@ App.register("tracking", {
 
       <div class="card"><div class="card-head">거절 목록 <span class="sub">통계 모수에서 제외 · 차기 버전 재등록 감지용</span></div>
         <div class="card-body">
-          ${rejected.length ? `<table class="tbl"><thead><tr><th>인덱스</th><th>Feature</th><th>부서</th><th>비고</th></tr></thead><tbody>
-            ${rejected.map(f => `<tr><td class="idx">${f.feature_index}</td><td>${f.name}</td><td>${f.department}</td>
+          ${rejected.length ? `<table class="tbl"><thead><tr><th>인덱스</th><th>제목</th><th>기능명</th><th>비고</th></tr></thead><tbody>
+            ${rejected.map(f => `<tr><td class="idx">${f.feature_index}</td><td>${f.name}</td><td>${f.function_name}</td>
               <td style="font-size:11.5px;color:var(--text-3)">차기 버전 인입 시 자동 매칭되어 "재등록" 표시됨</td></tr>`).join("")}</tbody></table>`
             : '<div class="empty">거절된 항목 없음</div>'}
         </div>

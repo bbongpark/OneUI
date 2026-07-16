@@ -1,4 +1,5 @@
-/* 리뷰 보드 — 500건 스케일 테이블: 필터/검색, 부문 점수, 종합(오버라이드), 예상 결정, 슬라이드 뷰어. */
+/* 리뷰 보드 — 500건 스케일 테이블: 필터/검색, 등급(종합 1개), 판정 근거, 예상 결정, 슬라이드 뷰어.
+   제목은 엑셀에 없어 AI가 변경점을 요약해 만든다(job_title). */
 App.register("review", {
   title: "리뷰 보드",
   render(el, app) {
@@ -20,14 +21,15 @@ App.register("review", {
       </div>
       <div id="map-banner"></div>
       <div class="filterbar">
-        <input type="search" id="f-q" placeholder="검색: 이름, 인덱스, 부서…">
+        <input type="search" id="f-q" placeholder="검색: 제목, 인덱스, 기능명…">
         <select id="f-grade"><option value="">등급 전체</option>
           ${Object.entries(App.GRADES).map(([k, v]) => `<option value="${k}">${v.label} · ${v.full}</option>`).join("")}</select>
-        <select id="f-dept"><option value="">부서 전체</option>${[...new Set(feats.map(f => f.department))].map(x => `<option>${x}</option>`).join("")}</select>
+        <select id="f-dept"><option value="">기능명 전체</option>${[...new Set(feats.map(f => f.function_name))].sort().map(x => `<option>${x}</option>`).join("")}</select>
+        <select id="f-cat"><option value="">AI카테고리 전체</option>${[...new Set(feats.map(f => f.ai_category))].filter(Boolean).sort().map(x => `<option>${x}</option>`).join("")}</select>
         <select id="f-state">
           <option value="">상태 전체</option><option value="needs_human">사람 확인 필요</option>
-          <option value="notready">PL 미준비</option><option value="risk">일정 리스크 high</option>
-          <option value="divergent">부문 권고 충돌</option><option value="rereg">재등록</option>
+          <option value="notready">PL 미준비</option><option value="risk">일정 리스크 있음</option>
+          <option value="divergent">부문 인식 충돌</option><option value="rereg">재등록</option>
           <option value="decided">결정됨</option><option value="devdone">개발 완료</option>
           <option value="rejected">거절 목록</option>
         </select>
@@ -35,7 +37,7 @@ App.register("review", {
       </div>
       <div class="card"><div class="tbl-wrap" style="max-height:calc(100vh - 250px);overflow-y:auto">
         <table class="tbl"><thead><tr>
-          <th>인덱스</th><th>Feature</th><th>부서</th><th>등급</th><th>판정 근거</th><th>결정</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
+          <th>인덱스</th><th>제목 <span style="font-weight:400;text-transform:none;color:var(--text-3)">(AI 요약)</span></th><th>기능명</th><th>등급</th><th>판정 근거</th><th>결정</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
         </tr></thead><tbody id="rows"></tbody>
       </table></div></div>`;
 
@@ -46,14 +48,16 @@ App.register("review", {
     const rows = el.querySelector("#rows");
     const draw = () => {
       const q = el.querySelector("#f-q").value.toLowerCase();
-      const fg = el.querySelector("#f-grade").value, fd = el.querySelector("#f-dept").value, fs = el.querySelector("#f-state").value;
+      const fg = el.querySelector("#f-grade").value, fd = el.querySelector("#f-dept").value;
+      const fc = el.querySelector("#f-cat").value, fs = el.querySelector("#f-state").value;
       const list = feats.filter(f => {
         const it = rv[f.feature_index] || {}, syn = it.synthesis || {}, plc = pl[f.feature_index] || {};
         if (fs !== "rejected" && f.decision === "rejected") return false;
         if (fs === "rejected") return f.decision === "rejected";
-        if (q && !(f.name.toLowerCase().includes(q) || f.feature_index.toLowerCase().includes(q) || f.department.includes(q))) return false;
+        if (q && !((f.name || "").toLowerCase().includes(q) || f.feature_index.toLowerCase().includes(q) || (f.function_name || "").includes(q))) return false;
         if (fg && syn.final_grade !== fg) return false;
-        if (fd && f.department !== fd) return false;
+        if (fd && f.function_name !== fd) return false;
+        if (fc && f.ai_category !== fc) return false;
         if (fs === "needs_human" && syn.status !== "needs_human") return false;
         if (fs === "notready" && (plc.ready !== false)) return false;
         if (fs === "risk" && app.scheduleRisk(f).risk !== true) return false;
@@ -77,7 +81,7 @@ App.register("review", {
         return `<tr class="clickable" data-idx="${f.feature_index}">
           <td class="idx">${f.feature_index}${f.reregistered_from ? ` <span class="badge b-violet" title="이전 버전 ${f.reregistered_from}에서 거절/보류된 건의 재등록">재등록</span>` : ""}${f.input_changed ? ` <span class="badge b-blue" title="리뷰 후 입력이 변경됨 — 재확인 필요">입력변경</span>` : ""}</td>
           <td class="name" title="${f.name}">${f.name}</td>
-          <td>${f.department}</td>
+          <td>${f.function_name}</td>
           <td>${app.gradeBadge(syn.final_grade)}${it.override ? ' <span title="사람이 수정함 (' + it.override.by + ')">✍</span>' : ""}${syn.status === "needs_human" ? ' <span class="badge b-blue">확인</span>' : ""}${syn.divergent ? ' <span class="badge b-cgo" title="' + (syn.divergent_summary || "") + '">충돌</span>' : ""}</td>
           <td>${why}</td>
           <td>${f.decision ? app.recBadge(f.decision === "rejected" ? "rejected" : f.decision) : '<span class="badge b-outline">회의 전</span>'}</td>
@@ -103,8 +107,8 @@ App.register("review", {
       const per = it.personas || {};
       const body = App.el(`
         <div class="kv">
-          <dt>부서</dt><dd>${f.department}</dd>
-          <dt>개발 상태</dt><dd>${f.dev_status}</dd>
+          <dt>기능명</dt><dd>${f.function_name}</dd>
+          <dt>AI카테고리</dt><dd>${f.ai_category || "—"}</dd>
           ${(app.state.boot.managed_columns && app.state.boot.managed_columns.length
              ? app.state.boot.managed_columns : Object.keys(f.row))
             .filter(c => f.row[c] !== undefined)
@@ -181,7 +185,7 @@ App.register("review", {
     };
 
     el.querySelectorAll("[data-run]").forEach(b => b.onclick = () => app.run(b.dataset.run));
-    ["#f-q", "#f-grade", "#f-dept", "#f-state"].forEach(s => el.querySelector(s).oninput = draw);
+    ["#f-q", "#f-grade", "#f-dept", "#f-cat", "#f-state"].forEach(s => el.querySelector(s).oninput = draw);
     draw();
 
     // ── PPT 매핑 확인 (사람 확정 절차) ──

@@ -13,14 +13,14 @@ App.register("settings", {
     const allCols = [...new Set(feats.slice(0, 100).flatMap(f => Object.keys(f.row || {})))];
     const noData = allCols.length === 0;
     // 시스템이 알아야 하는 항목 — 각각이 엑셀의 어느 열인지 지정한다
+    // (Feature 이름 열은 없다 — 제목은 AI가 변경점을 요약해 만든다)
     const ROLES = {
-      feature_index: { label: "인덱스 번호", why: "Feature 식별 · PPT 슬라이드 매핑 기준" },
-      feature_name: { label: "Feature 이름", why: "목록·회의 안건에 표시" },
-      department: { label: "제안 부서", why: "회의 일정 배정 · 부서별 현황 기준" },
-      dev_status: { label: "개발 상태", why: "Feature 진행 상태 표시" },
-      change_summary: { label: "변경점", why: "PL의 템플릿 준수 검사 대상" },
-      ux_schedule: { label: "UX 일정", why: "일정 리스크 판정 — 이게 있어야 개발 일정이 나온다", optional: true },
-      dev_schedule: { label: "개발 일정", why: "일정 리스크 판정 — DVR을 넘으면 리스크", optional: true }
+      feature_index: { label: "인덱스", why: "Feature 식별 · PPT 슬라이드 매핑 기준" },
+      function_name: { label: "기능명", why: "회의 일정 배정 · 기능별 현황 기준" },
+      ai_category: { label: "AI카테고리", why: "분류·필터 기준" },
+      change_summary: { label: "변경점", why: "리뷰의 핵심 입력 · 제목(AI 요약)의 원본 · 자료 보완 규칙 대상" },
+      ux_schedule: { label: "UX일정", why: "일정 리스크 판정 — 이게 있어야 개발 일정이 나온다", optional: true },
+      dev_schedule: { label: "개발일정", why: "일정 리스크 판정 — DVR을 넘으면 리스크", optional: true }
     };
     const roleOf = c => Object.keys(ROLES).find(k => (schema.fields || {})[k] === c) || "";
     // 실제 데이터에서 예시 값 — 맞는 열을 골랐는지 눈으로 확인하는 용도

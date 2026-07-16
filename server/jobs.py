@@ -92,10 +92,44 @@ def _batches(items, version):
 
 # ---------- 파이프라인 작업들 ----------
 
+def job_title(job):
+    """Feature 제목 생성 — 취합 엑셀에 이름 열이 없으므로 변경점을 AI가 요약해 붙인다."""
+    v = job["version"]
+    feats = _features(v)["features"]
+    todo = [f for f in feats if not f.get("name")]
+    if not todo:
+        log("제목 생성 대상 없음")
+        return
+    sc = store.load(store.path("config", "excel_schema.json"), {})
+    fields = sc.get("fields", {})
+    titles = {}
+    for batch in _batches(todo, v):
+        payload = {"features": [{"feature_index": f["feature_index"],
+                                 "change_summary": f["row"].get(fields.get("change_summary", ""), ""),
+                                 "function_name": f.get("function_name", ""),
+                                 "ai_category": f.get("ai_category", "")} for f in batch]}
+        out = engines.run("aux-title", _prompt("aux-title"), payload)
+        for r in out.get("results", []):
+            if r.get("title"):
+                titles[r["feature_index"]] = r["title"].strip()
+    def apply(obj):
+        for f in obj["features"]:
+            if f["feature_index"] in titles:
+                f["name"] = titles[f["feature_index"]]
+            elif not f.get("name"):        # AI가 못 만들면 변경점 앞부분으로 (빈 제목 방지)
+                raw = str(f["row"].get(fields.get("change_summary", ""), "")).strip()
+                f["name"] = (raw[:30] + "…") if len(raw) > 30 else (raw or f["feature_index"])
+        return obj
+    store.update(store.dpath(v, "features.json"), apply)
+    store.notify("job", "제목 생성 완료 (%s) — %d건 (변경점 요약)" % (v, len(titles)))
+
+
 def job_review(job):
     """등급 판정: ① 하드룰(자료 보완·단순 공유) → ② 나머지만 AI 페르소나가 P0/P1/P2.
     캐시(입력 해시+프롬프트 해시) 존중, 변경분만 실행."""
     v = job["version"]
+    if any(not f.get("name") for f in _features(v)["features"]):
+        enqueue("title", v, job["user"])            # 제목이 없으면 먼저 만든다
     feats = _features(v)["features"]
     rv_fp = store.dpath(v, "reviews.json")
     personas = ["persona-experience-planning", "persona-ux", "persona-dev", "persona-cxi"]
@@ -249,8 +283,9 @@ def job_schedule(job):
                       {"features": [{"feature_index": f["feature_index"], "row": _row_view(f["row"]),
                                      "synthesis": reviews.get(f["feature_index"], {}).get("synthesis")} for f in cand]})
     emap = {r["feature_index"]: r["est_min"] for r in est.get("results", [])}
+    # P0 먼저, 같은 기능명끼리 묶어서 배정
     order = sorted(cand, key=lambda f: (0 if (reviews.get(f["feature_index"], {}).get("synthesis") or {}).get("final_grade") == "P0" else 1,
-                                        f["department"]))
+                                        f.get("function_name", "")))
     followups = job["params"].get("followups", [])  # [{feature_index, action_id}]
     # 수동 관리된 슬롯 구조 유지, 배정만 새로 채움
     slots = [{"date": s["date"], "time": s["time"], "items": [],
@@ -365,7 +400,7 @@ def job_insight(job):
                 refs.append({"file": fn, "text": open(os.path.join(rdir, fn), encoding="utf-8").read()[:8000]})
     out = engines.run("aux-insight-report", _prompt("aux-insight-report"),
                       {"features": [{"feature_index": f["feature_index"], "name": f["name"],
-                                     "department": f["department"],
+                                     "function_name": f.get("function_name", ""),
                                      "synthesis": reviews.get(f["feature_index"], {}).get("synthesis")} for f in feats],
                        "references": refs})
     open(store.dpath(v, "insight.md"), "w", encoding="utf-8").write(out.get("markdown", ""))
@@ -472,11 +507,11 @@ def job_selftest(job):
                  (result["engine"], "전체 통과" if result["all_passed"] else "실패 항목 있음"))
 
 
-KIND_LABEL = {"review": "페르소나 리뷰", "synthesis": "종합 판정", "pl": "PL 검사", "schedule": "회의 일정 배정",
+KIND_LABEL = {"title": "제목 생성", "review": "부문 검토", "synthesis": "종합 등급 판정", "pl": "PL 검사", "schedule": "회의 일정 배정",
               "predict": "SW담당 예상 판정", "minutes": "회의록 추출", "plm_judge": "PLM 결과 판단",
               "insight": "인사이트 리포트", "golden": "골든셋 실행", "report_ppt": "보고 산출물 생성",
               "selftest": "엔진 자가진단", "ppt_render": "PPT 이미지 렌더링"}
-HANDLERS = {"review": job_review, "synthesis": job_synthesis, "pl": job_pl, "schedule": job_schedule,
+HANDLERS = {"title": job_title, "review": job_review, "synthesis": job_synthesis, "pl": job_pl, "schedule": job_schedule,
             "predict": job_predict, "minutes": job_minutes, "plm_judge": job_plm_judge,
             "insight": job_insight, "golden": job_golden, "report_ppt": job_report_ppt,
             "selftest": job_selftest, "ppt_render": job_ppt_render}

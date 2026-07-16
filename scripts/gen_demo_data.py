@@ -10,7 +10,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = lambda *p: os.path.join(ROOT, "data", *p)
 NOW = "2026-07-15"
 
-DEPTS = ["홈/런처", "카메라", "설정", "잠금화면", "커넥티비티", "메시지/통화", "갤러리", "시스템UI"]
+FUNCS = ["홈/런처", "카메라", "설정", "잠금화면", "커넥티비티", "메시지/통화", "갤러리", "시스템UI"]   # 기능명
+AI_CATS = ["온디바이스 AI", "생성형 AI", "AI 추천", "AI 없음", "클라우드 AI"]                        # AI카테고리
 NAMES = [
     "잠금화면 위젯 커스터마이징 확장", "카메라 야간모드 자동 전환", "홈 화면 폴더 색상 지정",
     "알림 요약 AI 카드", "빠른 설정 레이아웃 개편", "통화 녹음 자동 텍스트 변환",
@@ -57,8 +58,11 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
     feats, reviews, plc = [], {}, {}
     for i in range(1, n + 1):
         idx = f"F{i:03d}"
-        name = NAMES[(i - 1) % len(NAMES)] + ("" if i <= len(NAMES) else f" {i//len(NAMES)+1}차")
-        dept = DEPTS[i % len(DEPTS)]
+        # 엑셀에는 Feature 이름 열이 없다 — 아래 NAMES는 변경점 문장을 만드는 재료로만 쓰고,
+        # 화면에 보이는 제목(name)은 AI가 변경점을 요약해 채운다(job_title).
+        topic = NAMES[(i - 1) % len(NAMES)] + ("" if i <= len(NAMES) else f" {i//len(NAMES)+1}차")
+        func = FUNCS[i % len(FUNCS)]
+        cat = AI_CATS[i % len(AI_CATS)]
         dev_st = random.choice(STATUS_POOL)
         # CL 열: 실제 운영에서 개발 완료 판정 기준 — 커밋된 건만 CL 번호가 채워진다
         cl = str(random.randint(4100000, 4999999)) if dev_st in ("구현완료", "검증중", "검증완료") else \
@@ -71,15 +75,14 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         ctype = random.choice(CHANGE_TYPES)
         bad = random.random() < 0.1
         change = random.choice(["개선함", "수정", "-", "TBD"]) if bad else \
-            f"[변경 전] 기존 {name.split()[0]} 동작 유지 → [변경 후] {name} 적용. 사유: 사용성 개선 및 VOC 대응. 영향: {dept} 모듈."
+            f"[변경 전] 기존 {topic.split()[0]} 동작 유지 → [변경 후] {topic} 적용. 사유: 사용성 개선 및 VOC 대응. 영향: {func} 모듈."
         row = {
-            "인덱스": idx, "Feature명": name, "제안부서": dept, "변경유형": ctype,
-            "개발상태": dev_st, "CL": cl,
+            "인덱스": idx, "기능명": func, "AI카테고리": cat, "변경유형": ctype,
+            "CL": cl,
             "UX일정": ux_d.isoformat() if ux_d else "",
             "개발일정": dev_d.isoformat() if dev_d else "",
             "적용모델": random.choice(MODELS),
             "변경점": change,
-            "목표시나리오": f"{dept} 사용 빈도 상위 시나리오 개선",
             "VOC건수": random.choice(["", str(random.randint(20, 4200))]),
         }
         st_reviewed = i <= int(n * reviewed_ratio)
@@ -92,9 +95,12 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         reregistered = None
         if prev_rejected and i % 17 == 0 and prev_rejected:
             reregistered = prev_rejected.pop(0) if prev_rejected else None
+        # name = AI가 변경점을 요약한 제목 (job_title). 데모에선 미리 채워둔다.
+        title = "" if bad else f"{topic} 적용"
         feats.append({
-            "feature_index": idx, "name": name, "department": dept,
-            "dev_status": dev_st, "row": row, "row_hash": h(json.dumps(row, ensure_ascii=False)),
+            "feature_index": idx, "name": title or (change[:30] + "…" if len(change) > 30 else change),
+            "function_name": func, "ai_category": cat,
+            "row": row, "row_hash": h(json.dumps(row, ensure_ascii=False)),
             "status": status, "decision": decision,
             "decision_conditions": ["정량 근거 보완 후 재확인"] if decision == "conditional_go" else [],
             "slides": [f"{idx}_{k}.svg" for k in range(1, 4)] if i <= 12 else ([f"{idx}_1.svg"] if i % 3 else []),
@@ -251,7 +257,7 @@ def main():
                    f'<rect width="960" height="540" fill="#f4f6fa"/><rect x="24" y="24" width="912" height="64" rx="8" fill="#0f3460"/>'
                    f'<text x="44" y="64" font-family="Malgun Gothic" font-size="26" fill="#fff">[{f["feature_index"]}] {f["name"]}</text>'
                    f'<rect x="660" y="104" width="276" height="120" rx="8" fill="#fff" stroke="#c5d0e0"/>'
-                   f'<text x="676" y="132" font-size="15" fill="#33415c" font-family="Malgun Gothic">담당: {f["department"]} · 상태: {f["dev_status"]}</text>'
+                   f'<text x="676" y="132" font-size="15" fill="#33415c" font-family="Malgun Gothic">기능: {f["function_name"]} · AI: {f["ai_category"]}</text>'
                    f'<text x="676" y="158" font-size="15" fill="#33415c" font-family="Malgun Gothic">적용: {f["row"]["적용모델"]} · VOC: {f["row"]["VOC건수"] or "미기재"}</text>'
                    f'<rect x="24" y="104" width="612" height="400" rx="8" fill="#fff" stroke="#c5d0e0"/>'
                    f'<text x="44" y="140" font-size="18" fill="#1a2233" font-family="Malgun Gothic">슬라이드 {k} — 변경점 요약 (데모 플레이스홀더)</text>'

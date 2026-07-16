@@ -487,7 +487,10 @@ def api_ingest_upload(b):
     with open(fp, "wb") as f:
         f.write(base64.b64decode(b["b64"]))
     if fname.lower().endswith(".xlsx"):
-        return ingest.ingest_excel(version, fp)
+        out = ingest.ingest_excel(version, fp)
+        jobs.enqueue("title", version, b.get("user", "?"))   # 이름 열이 없으므로 변경점 요약으로 제목 생성
+        out["note"] = "제목 생성 작업이 큐에 등록됨 (변경점 요약)"
+        return out
     if fname.lower().endswith(".pptx"):
         out = ingest.ingest_ppt(version, fp)
         jobs.enqueue("ppt_render", version, b.get("user", "?"), {"file": fp})
