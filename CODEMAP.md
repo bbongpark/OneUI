@@ -239,7 +239,8 @@
 - **SW담당 예상**: `job_predict`가 **PL ready 안건만** 예측(자료 없으면 예측 근거 없음). 재실행 시 stale 예측 비움. 리뷰 보드 상세 모달 맨 아래에 예상+근거 표시.
 - **적중률 카드**: 큰 숫자 = 최근 5개 회의 **안건 수 가중 종합**(단순 평균 아님, detail.match 합산).
 - **AI 상세 조건부 표시**: 리뷰 보드 상세 모달에서 `ai_category`가 `config/excel_schema.json`의 `ai_detail.hide_values`(X·AI 없음 등)에 없으면 `ai_detail.columns`를 추가 섹션으로 표시. 열 이름·트리거 값 모두 config(하드코딩 금지). managed_columns와 별개 — 상세 표시 전용이라 AI 입력엔 안 들어가고 원본 행에서 직접 읽는다.
-- **일정 관리 화면(schedule)**: 개발 일정 임박 항목 날짜별 그룹 + 공지 메일 초안(수신자 `;` 연결 + 표). 담당자 열은 `schema_fields.dev_owner`(config), `.com` 메일만 추출. 복사는 `App.copyText`/`copyRich`(http 폴백 포함).
+- **일정 관리 화면(schedule)**: 개발 일정 임박 항목 날짜별 그룹 + 공지 메일 초안(수신자 `;` 연결 + 표 + 편집 가능 인사말/맺음말). 표 컬럼: 인덱스·기능명·제목·변경점·개발일정·지연사유. 담당자 열은 `schema_fields.dev_owner`, 지연사유는 `dev_delay_reason`(둘 다 config). 복사는 `App.copyText`/`copyRich`(http 폴백 포함).
+- **개발일정 지연 감지**: `ingest.py`가 갱신 인입 시 `dev_schedule`이 이전보다 뒤로 밀린 행을 `_is_later`로 감지 → `feature.dev_delay{from,to,reason}` 기록 + `store.notify("delay", …)`. 알림 타입 `delay`(notifications.js ICONS/TYPES). 트리거 열과 무관하게 개발일정만 바뀌어도 감지.
 
 ---
 

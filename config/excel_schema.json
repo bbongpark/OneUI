@@ -10,9 +10,11 @@
     "change_summary": "변경점",
     "ux_schedule": "UX일정",
     "dev_schedule": "개발일정",
-    "dev_owner": "개발담당자"
+    "dev_owner": "개발담당자",
+    "dev_delay_reason": "지연사유"
   },
   "_dev_owner_comment": "개발 담당자 메일 열(선택). 일정 관리 화면이 공지 메일 수신자를 이 열에서 뽑는다 — 셀 값에서 '.com'으로 끝나는 토큰을 추출해 ;로 연결한다. 회사 실제 열 이름으로 교체.",
+  "_dev_delay_reason_comment": "개발일정 지연사유 열(선택). 개발일정을 뒤로 미룬 기능은 이 열에 사유를 적는다. 인입 시 이전 대비 개발일정이 늦어진 행을 감지해 알림을 발행하고, 일정 관리 화면·공지 메일 표에 표시한다.",
   "_dev_done_rule_comment": "개발 완료 판정 규칙. mode=filled: column에 값이 있으면 완료 (예: CL 열에 CL 번호). mode=values: column의 값이 values 중 하나면 완료. pattern(선택): 정규식으로 값 형식 검증. '-', 'TBD' 등 자리채움 값은 빈 값으로 본다. 설정 화면에서 편집.",
   "dev_done_rule": {
     "mode": "filled",

@@ -4,8 +4,8 @@ App.register("notifications", {
   render(el, app) {
     const ICONS = { job: ["⚙", "var(--p2-bg)"], needs_human: ["✋", "var(--accent-bg)"], risk: ["⚠", "var(--crit-bg)"],
                     meeting: ["📅", "var(--violet-bg)"], persona: ["🎭", "var(--warn-bg)"], followup: ["★", "var(--accent-bg)"],
-                    override: ["✍", "var(--warn-bg)"] };
-    const TYPES = { "": "전체", job: "작업", needs_human: "사람 확인", risk: "리스크", meeting: "회의", persona: "페르소나", followup: "후속 보고", override: "판정 수정" };
+                    override: ["✍", "var(--warn-bg)"], delay: ["⏰", "var(--crit-bg)"] };
+    const TYPES = { "": "전체", job: "작업", needs_human: "사람 확인", risk: "리스크", meeting: "회의", persona: "페르소나", followup: "후속 보고", override: "판정 수정", delay: "일정 지연" };
     let filter = "";
     el.innerHTML = `
       <div class="page-head">

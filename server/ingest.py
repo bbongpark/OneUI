@@ -43,8 +43,10 @@ def ingest_excel(version, xlsx_path):
     prev = {f["feature_index"]: f for f in (store.load(fp, {"features": []}) or {}).get("features", [])}
     trig = sc.get("review_trigger_columns", [])
     dropped = _prev_dropped(version)
+    dev_col = fields.get("dev_schedule")
+    reason_col = fields.get("dev_delay_reason")
 
-    feats, n_new, n_changed, n_kept = [], 0, 0, 0
+    feats, n_new, n_changed, n_kept, delayed = [], 0, 0, 0, []
     for r in rows:
         idx = r.get(idx_col, "").strip()
         if not idx:
@@ -65,6 +67,8 @@ def ingest_excel(version, xlsx_path):
                 "input_changed": False})
         else:
             trig_changed = any((pf["row"].get(c, "") != r.get(c, "")) for c in trig) if trig else (pf["row_hash"] != h)
+            old_dev = pf["row"].get(dev_col, "") if dev_col else ""
+            new_dev = r.get(dev_col, "") if dev_col else ""
             pf = dict(pf, row=r, function_name=func, ai_category=cat)
             if trig_changed:
                 pf["name"] = ""                 # 변경점이 바뀌었으면 제목도 다시 만든다
@@ -74,6 +78,13 @@ def ingest_excel(version, xlsx_path):
                 pf["input_changed"] = pf["status"] in ("meeting_wait", "decided")
             else:
                 n_kept += 1                  # 해시 유지 → 캐시 유지
+            # 개발일정이 이전보다 뒤로 밀렸으면 지연으로 기록 (트리거 열과 무관하게 감지)
+            if dev_col and _is_later(new_dev, old_dev):
+                reason = r.get(reason_col, "") if reason_col else ""
+                pf["dev_delay"] = {"from": old_dev, "to": new_dev, "reason": reason}
+                delayed.append((idx, old_dev, new_dev, reason))
+            else:
+                pf.pop("dev_delay", None)    # 더 밀리지 않았으면 이전 지연 표시 해제
             feats.append(pf)
         prev.pop(idx, None)
 
@@ -102,10 +113,23 @@ def ingest_excel(version, xlsx_path):
                  (version, n_new, n_changed, n_kept,
                   " · 재등록 감지 %d" % rereg if rereg else "",
                   " · 갱신본에 없음 %d" % len(removed) if removed else ""))
+    # 개발일정이 뒤로 밀린 건 — 건별 알림 (지연사유 미기재면 경고)
+    for idx, o, n, reason in delayed:
+        store.notify("delay", "%s 개발일정 지연: %s → %s%s" %
+                     (idx, o or "미정", n, (" (사유: %s)" % reason) if reason else " — 지연사유 미기재"))
     return {"kind": "xlsx", "total": len(feats), "new": n_new, "changed": n_changed,
-            "kept": n_kept, "reregistered": rereg, "missing": removed[:20],
+            "kept": n_kept, "reregistered": rereg, "missing": removed[:20], "delayed": len(delayed),
             "columns": len(rows[0]), "all_columns": list(rows[0].keys()), "new_columns": new_cols,
             "managed_columns": sc.get("managed_columns", [])}
+
+
+def _is_later(a, b):
+    """개발일정 a가 b보다 뒤(늦은 날짜)면 True. 둘 다 파싱돼야 판정 — 형식이 달라도 y/m/d만 뽑는다."""
+    def t(s):
+        m = re.search(r"(\d{4})\D+(\d{1,2})\D+(\d{1,2})", str(s or ""))
+        return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+    ta, tb = t(a), t(b)
+    return bool(ta and tb and ta > tb)
 
 
 def ingest_ppt(version, pptx_path):

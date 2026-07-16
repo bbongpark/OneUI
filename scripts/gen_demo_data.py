@@ -36,6 +36,8 @@ NAMES = [
 ]
 DEV_OWNERS = ["jh.kim@partner-dev.com", "yr.lee@partner-dev.com", "sw.park@partner-dev.com",
               "mj.choi@partner-dev.com", "dh.jung@partner-dev.com", "hs.kang@partner-dev.com"]  # 개발담당자 메일
+DELAY_REASONS = ["선행 과제 의존성 지연", "인력 재배치로 착수 지연", "설계 변경으로 재작업",
+                 "QA 이슈 대응 우선", "타 부서 API 제공 일정 지연"]  # 개발일정 지연사유
 STATUS_POOL = ["기획완료", "설계중", "구현중", "구현완료", "검증중", "검증완료"]
 MODELS = ["전 모델", "플래그십", "폴더블", "플래그십+폴더블"]
 AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰)
@@ -89,6 +91,9 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         }
         # 개발 담당자 메일 — 개발 일정이 잡힌 항목에만. 셀에 1~2명이 공백으로 들어간다(.com 아이디).
         row["개발담당자"] = " ".join(random.sample(DEV_OWNERS, random.randint(1, 2))) if dev_d else ""
+        # 개발일정 지연 — 일부 항목은 일정을 뒤로 미뤘고 지연사유가 있다(비지연은 빈칸)
+        delayed = bool(dev_d) and random.random() < 0.25
+        row["지연사유"] = random.choice(DELAY_REASONS) if delayed else ""
         # AI 상세 열 — AI 관련 Feature에만 값이 있다(비AI는 빈칸). config/excel_schema.json의 ai_detail로 상세에 표시.
         is_ai = cat != "AI 없음"
         row.update({
@@ -112,7 +117,7 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             reregistered = prev_rejected.pop(0) if prev_rejected else None
         # name = AI가 변경점을 요약한 제목 (job_title). 데모에선 미리 채워둔다.
         title = "" if bad else f"{topic} 적용"
-        feats.append({
+        feat = {
             "feature_index": idx, "name": title or (change[:30] + "…" if len(change) > 30 else change),
             "function_name": func, "ai_category": cat,
             "row": row, "row_hash": h(json.dumps(row, ensure_ascii=False)),
@@ -120,7 +125,12 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             "decision_conditions": ["정량 근거 보완 후 재확인"] if decision == "hold" else [],
             "slides": [f"{idx}_{k}.svg" for k in range(1, 4)] if i <= 12 else ([f"{idx}_1.svg"] if i % 3 else []),
             "reregistered_from": reregistered, "input_changed": (i % 23 == 0 and st_reviewed),
-        })
+        }
+        # 지연 항목: 이전 개발일정(현재보다 1~3주 앞) → 현재로 밀림. 인입 시 감지되는 형태를 데모로 재현.
+        if delayed:
+            prev_dev = dev_d - datetime.timedelta(days=random.randint(7, 21))
+            feat["dev_delay"] = {"from": prev_dev.isoformat(), "to": dev_d.isoformat(), "reason": row["지연사유"]}
+        feats.append(feat)
         # 변경점이 부실하면 규칙이 앞단에서 '자료 보완 필요'로 확정 — AI를 부르지 않는다
         if bad and (st_reviewed or status == "reviewing"):
             why = "'변경점'이 자리채움 값('%s')" % change if change in ("-", "TBD") else \
@@ -238,8 +248,16 @@ def main():
          "due": "2026-08-21", "plm_status": "in_progress", "plm_id": "PLM-20260721-003", "report_needed": None, "followup_scheduled": False}
     ]}, open(D("8.5", "actions.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
+    # 개발일정 지연 알림 (데모 — 실제로는 갱신 인입 시 ingest가 발행)
+    delay_notifs = []
+    for k, f in enumerate([f for f in f85 if f.get("dev_delay")][:4]):
+        dd = f["dev_delay"]
+        delay_notifs.append({"id": "D%d" % (k + 1), "type": "delay",
+            "text": "%s 개발일정 지연: %s → %s (사유: %s)" % (f["feature_index"], dd["from"], dd["to"], dd["reason"]),
+            "at": NOW + "T13:%02d:00" % (10 + k), "read_by": []})
+
     # 알림
-    json.dump({"rev": 1, "items": [
+    json.dump({"rev": 1, "items": delay_notifs + [
         {"id": "N5", "type": "job", "text": "PL 검사 배치 완료 (45건 판정, 미준비 17건)", "at": NOW + "T14:02:00", "read_by": []},
         {"id": "N4", "type": "needs_human", "text": "종합 판정 보류 3건 — 부문 권고 충돌, 사람 확인 필요", "at": NOW + "T13:40:00", "read_by": []},
         {"id": "N3", "type": "risk", "text": "일정 리스크 high 6건 감지 (개발 완료 마일스톤 기준)", "at": NOW + "T13:38:00", "read_by": []},
