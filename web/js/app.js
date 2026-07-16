@@ -164,6 +164,28 @@ const App = {
     return m[s] ? `<span class="badge ${m[s][0]}">${m[s][1]}</span>` : "";
   },
 
+  // ── 개발 완료 판정 ──
+  // 규칙은 config/excel_schema.json의 dev_done_rule (설정 화면에서 편집).
+  // filled: 지정 열에 값이 있으면 완료 (예: CL 열의 CL 번호) · values: 지정 열의 값이 목록에 있으면 완료
+  PLACEHOLDERS: ["-", "–", "—", "tbd", "n/a", "na", "미정", "추후", "없음", "예정"],
+
+  hasValue(v) {
+    const s = String(v == null ? "" : v).trim();
+    return !!s && !this.PLACEHOLDERS.includes(s.toLowerCase());
+  },
+
+  devDoneRule() { return this.state.boot.dev_done_rule || {}; },
+
+  isDevDone(f) {
+    const r = this.devDoneRule();
+    if (!r.column) return null;                       // 미설정
+    const v = (f.row || {})[r.column];
+    if (r.mode === "values") return (r.values || []).includes(String(v == null ? "" : v).trim());
+    if (!this.hasValue(v)) return false;              // filled
+    if (r.pattern) { try { return new RegExp(r.pattern).test(String(v).trim()); } catch { return true; } }
+    return true;
+  },
+
   // ── 관리 열 선택 창 (업로드 직후 · 설정에서 공용) ──
   // cols: 엑셀의 전체 열, managed: 현재 선택된 열, newCols: 이번에 새로 감지된 열
   columnPicker({ cols, managed, newCols = [], onSaved }) {

@@ -28,7 +28,8 @@ App.register("review", {
           <option value="">상태 전체</option><option value="needs_human">사람 확인 필요</option>
           <option value="notready">PL 미준비</option><option value="risk">일정 리스크 high</option>
           <option value="divergent">부문 권고 충돌</option><option value="rereg">재등록</option>
-          <option value="decided">결정됨</option><option value="rejected">거절 목록</option>
+          <option value="decided">결정됨</option><option value="devdone">개발 완료</option>
+          <option value="rejected">거절 목록</option>
         </select>
         <span class="count" id="f-count"></span>
       </div>
@@ -57,6 +58,7 @@ App.register("review", {
         if (fs === "divergent" && !syn.divergent) return false;
         if (fs === "rereg" && !f.reregistered_from) return false;
         if (fs === "decided" && f.status !== "decided") return false;
+        if (fs === "devdone" && !app.isDevDone(f)) return false;
         return true;
       });
       el.querySelector("#f-count").textContent = list.length + "건";

@@ -6,9 +6,9 @@ App.register("dashboard", {
     const alive = feats.filter(f => f.decision !== "rejected");          // rejected = 모수 제외
     const rv = d.reviews.items, pl = d.pl_checks.items;
     const reviewed = alive.filter(f => rv[f.feature_index] && rv[f.feature_index].synthesis);
-    // 개발 완료 = 설정에서 지정한 "완료로 볼 상태 값" (엑셀마다 어휘가 다르므로 하드코딩 금지)
-    const doneVals = app.state.boot.dev_status_done_values || [];
-    const devDone = alive.filter(f => doneVals.includes(f.dev_status));
+    // 개발 완료 = 설정의 판정 규칙 (예: CL 열에 CL 번호가 있으면 완료). 열 이름·값 하드코딩 금지
+    const dvRule = app.devDoneRule();
+    const devDone = dvRule.column ? alive.filter(f => app.isDevDone(f)) : [];
     const plChecked = alive.filter(f => pl[f.feature_index]);
     const plReady = plChecked.filter(f => pl[f.feature_index].ready);
     const riskHigh = alive.filter(f => (pl[f.feature_index] || {}).schedule_risk === "high");
@@ -60,12 +60,16 @@ App.register("dashboard", {
 
       <div class="grid kpi-grid" style="margin-bottom:14px">
         ${kpi("리뷰 진행률", reviewed.length, alive.length, { foot: `${reviewed.length} / ${alive.length}건`, drill: "all" })}
-        ${doneVals.length
-          ? kpi("개발 완료 진행률", devDone.length, alive.length, { foot: `${devDone.length}건 · 완료 기준: ${doneVals.join(", ")}`, color: "var(--good)", drill: "all" })
-          : `<div class="kpi" data-drill="settings" title="설정에서 완료 기준을 지정하세요">
+        ${dvRule.column
+          ? kpi("개발 완료 진행률", devDone.length, alive.length, {
+              foot: `${devDone.length}건 · 기준: ${dvRule.mode === "values"
+                ? `'${dvRule.column}' = ${(dvRule.values || []).join(", ")}`
+                : `'${dvRule.column}' 값 있음`}`,
+              color: "var(--good)", drill: "devdone" })
+          : `<div class="kpi" data-drill="settings" title="설정에서 완료 판정 규칙을 지정하세요">
                <div class="lbl"><span>개발 완료 진행률</span></div>
                <div class="num" style="font-size:15px;color:var(--accent)">설정 필요</div>
-               <div class="foot">설정 → 개발 완료로 볼 상태 값 지정</div></div>`}
+               <div class="foot">설정 → 개발 완료 판정 규칙 지정</div></div>`}
         ${kpi("PL 통과율", plReady.length, plChecked.length || 1, { foot: `미준비 ${plChecked.length - plReady.length}건`, color: "var(--serious)", drill: "notready" })}
         ${kpi("일정 리스크", riskHigh.length, null, { cls: riskHigh.length ? "alert" : "", foot: "high 등급 건수", drill: "risk" })}
         ${kpi("사람 확인 필요", needsHuman.length, null, { cls: needsHuman.length ? "blue" : "", foot: "AI 판단 보류", drill: "needs_human" })}

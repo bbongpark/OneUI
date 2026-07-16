@@ -58,9 +58,23 @@ App.register("settings", {
             </tr>`).join("")}
           </tbody></table></div>
           <p style="font-size:11px;color:var(--text-3);margin-top:8px">관리 열만 AI 페르소나에 전달되고 리뷰 보드 상세에 표시됩니다. 목록을 바꾸려면 "관리 열 선택".</p>
-          <div class="section-label" style="display:flex;align-items:center;gap:8px">개발 완료로 볼 상태 값
-            <span style="font-weight:400;text-transform:none">— 현황판 "개발 완료 진행률" 집계 기준. 개발 상태 열의 실제 값에서 고르세요</span></div>
-          <div id="dv-box"></div>`}
+          <div class="section-label" style="display:flex;align-items:center;gap:8px">개발 완료 판정 규칙
+            <span style="font-weight:400;text-transform:none">— 현황판 "개발 완료 진행률" 집계 기준</span></div>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12.5px">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+              <input type="radio" name="dv-mode" value="filled" style="width:auto" ${dis} ${(schema.dev_done_rule || {}).mode !== "values" ? "checked" : ""}>
+              <b>열에 값이 있으면 완료</b> <span style="color:var(--text-3)">(예: CL 열에 CL 번호)</span></label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+              <input type="radio" name="dv-mode" value="values" style="width:auto" ${dis} ${(schema.dev_done_rule || {}).mode === "values" ? "checked" : ""}>
+              <b>열의 값이 특정 값이면 완료</b></label>
+            <label style="display:flex;align-items:center;gap:6px">판정 열
+              <select id="dv-col" ${dis}><option value="">— 선택 —</option>
+                ${allCols.map(c => `<option ${(schema.dev_done_rule || {}).column === c ? "selected" : ""}>${c}</option>`).join("")}</select></label>
+            <label id="dv-pat-wrap" style="display:flex;align-items:center;gap:6px">값 형식 <span style="color:var(--text-3);font-size:11px">선택·정규식</span>
+              <input id="dv-pat" value="${(schema.dev_done_rule || {}).pattern || ""}" placeholder="예: ^\\d{6,}$" style="width:120px" ${dis}></label>
+          </div>
+          <div id="dv-box" style="margin-top:8px"></div>
+          <div id="dv-preview" style="margin-top:8px;font-size:12.5px"></div>`}
         </div>
       </div>
 
@@ -116,32 +130,61 @@ App.register("settings", {
         if (h) h.onchange = () =>
           el.querySelectorAll(`[data-col-row]:not([style*="none"]) [${attr}]`).forEach(c => c.checked = h.checked);
       });
-      // 개발 완료로 볼 상태 값 — 개발 상태 열의 실제 값을 읽어 체크박스로
-      const drawDoneValues = () => {
-        const col = [...el.querySelectorAll("[data-role]")].find(s => s.value === "dev_status")?.dataset.role;
-        const box = el.querySelector("#dv-box");
+      // 개발 완료 판정 규칙 — 지금 설정으로 몇 건이 완료로 잡히는지 즉시 보여준다
+      const preview = () => {
+        const mode = el.querySelector("[name=dv-mode]:checked").value;
+        const col = el.querySelector("#dv-col").value;
+        const pat = el.querySelector("#dv-pat").value;
+        const vals = [...el.querySelectorAll("[data-dv]:checked")].map(c => c.dataset.dv);
+        const prev = el.querySelector("#dv-preview");
         if (!col) {
-          box.innerHTML = '<div style="font-size:12px;color:var(--serious)">개발 상태 열을 논리 필드에서 먼저 지정하세요.</div>';
+          prev.innerHTML = '<span style="color:var(--serious)">판정 열을 선택하세요 — 지정 전에는 현황판에 "설정 필요"로 표시됩니다.</span>';
           return;
         }
-        const vals = [...new Set(feats.map(f => (f.row || {})[col]).filter(v => v))].sort();
-        const done = schema.dev_status_done_values || [];
-        box.innerHTML = vals.length
-          ? `<div style="font-size:11.5px;color:var(--text-3);margin-bottom:4px">'${col}' 열의 값 ${vals.length}종</div>` +
-            vals.map(v => {
-              const n = feats.filter(f => (f.row || {})[col] === v).length;
-              return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;font-size:12.5px;cursor:pointer">
-                <input type="checkbox" data-dv="${v}" ${done.includes(v) ? "checked" : ""} style="width:auto" ${dis}>
-                ${v} <span style="color:var(--text-3);font-size:11px">${n}건</span></label>`;
-            }).join("")
-          : '<div style="font-size:12px;color:var(--text-3)">이 열에 값이 없습니다.</div>';
+        const keep = app.state.boot.dev_done_rule;
+        app.state.boot.dev_done_rule = { mode, column: col, values: vals, pattern: mode === "filled" ? pat : "" };
+        const alive = feats.filter(f => f.decision !== "rejected");
+        const done = alive.filter(f => app.isDevDone(f));
+        const sample = done.slice(0, 3).map(f => `${f.feature_index}=${(f.row || {})[col]}`).join(" · ");
+        app.state.boot.dev_done_rule = keep;
+        let err = "";
+        if (mode === "filled" && pat) { try { new RegExp(pat); } catch { err = ' <span style="color:var(--crit)">⚠ 정규식 오류 — 무시됨</span>'; } }
+        prev.innerHTML = `<span class="badge b-go">미리보기</span> 이 규칙으로 <b>${done.length} / ${alive.length}건</b>
+          (${alive.length ? Math.round(done.length / alive.length * 100) : 0}%)이 개발 완료로 집계됩니다${err}
+          ${sample ? `<div style="color:var(--text-3);font-size:11.5px;margin-top:2px">예: ${sample}</div>` : ""}`;
       };
-      drawDoneValues();
+      // 모드/열에 따라 값 목록·패턴 입력 표시를 갱신
+      const ruleUI = () => {
+        const mode = el.querySelector("[name=dv-mode]:checked").value;
+        const col = el.querySelector("#dv-col").value;
+        const box = el.querySelector("#dv-box");
+        el.querySelector("#dv-pat-wrap").style.display = mode === "filled" ? "" : "none";
+        if (mode === "values" && col) {
+          const vals = [...new Set(feats.map(f => (f.row || {})[col]).filter(v => String(v || "").trim()))].sort();
+          const saved = (schema.dev_done_rule || {}).values || [];
+          box.innerHTML = vals.length
+            ? `<div style="font-size:11.5px;color:var(--text-3);margin-bottom:4px">'${col}' 열의 값 ${vals.length}종 — 완료로 볼 값을 고르세요</div>` +
+              vals.map(v => {
+                const n = feats.filter(f => (f.row || {})[col] === v).length;
+                return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;font-size:12.5px;cursor:pointer">
+                  <input type="checkbox" data-dv="${v}" ${saved.includes(v) ? "checked" : ""} style="width:auto" ${dis}>
+                  ${v} <span style="color:var(--text-3);font-size:11px">${n}건</span></label>`;
+              }).join("")
+            : '<div style="font-size:12px;color:var(--text-3)">이 열에 값이 없습니다.</div>';
+          box.querySelectorAll("[data-dv]").forEach(c => c.onchange = preview);
+        } else {
+          box.innerHTML = "";
+        }
+        preview();
+      };
+      el.querySelectorAll("[name=dv-mode]").forEach(r => r.onchange = ruleUI);
+      el.querySelector("#dv-col").onchange = ruleUI;
+      el.querySelector("#dv-pat").oninput = preview;
+      ruleUI();
 
-      // 논리 필드 중복 방지 + 개발 상태 열 변경 시 값 목록 갱신
+      // 논리 필드 중복 방지
       el.querySelectorAll("[data-role]").forEach(s => s.onchange = () => {
         if (s.value) el.querySelectorAll("[data-role]").forEach(o => { if (o !== s && o.value === s.value) o.value = ""; });
-        drawDoneValues();
       });
     }
 
@@ -179,7 +222,12 @@ App.register("settings", {
           const schemaNew = { ...schema, sheet_name: el.querySelector("#sc-sheet").value,
             header_row: +el.querySelector("#sc-hdr").value, fields,
             required_columns: picked("data-req"), review_trigger_columns: picked("data-trig"),
-            dev_status_done_values: picked("data-dv") };
+            dev_done_rule: {
+              mode: el.querySelector("[name=dv-mode]:checked").value,
+              column: el.querySelector("#dv-col").value,
+              values: picked("data-dv"),
+              pattern: el.querySelector("[name=dv-mode]:checked").value === "filled" ? el.querySelector("#dv-pat").value : ""
+            } };
           await app.api("/api/config/excel_schema", { ...auth, data: schemaNew });
         }
         el.querySelector("#s-msg").textContent = "저장됨 · " + new Date().toLocaleTimeString();

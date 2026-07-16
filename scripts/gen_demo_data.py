@@ -57,9 +57,13 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
         idx = f"F{i:03d}"
         name = NAMES[(i - 1) % len(NAMES)] + ("" if i <= len(NAMES) else f" {i//len(NAMES)+1}차")
         dept = DEPTS[i % len(DEPTS)]
+        dev_st = random.choice(STATUS_POOL)
+        # CL 열: 실제 운영에서 개발 완료 판정 기준 — 커밋된 건만 CL 번호가 채워진다
+        cl = str(random.randint(4100000, 4999999)) if dev_st in ("구현완료", "검증중", "검증완료") else \
+             random.choice(["", "", "", "-", "TBD"])
         row = {
             "인덱스": idx, "Feature명": name, "제안부서": dept,
-            "개발상태": random.choice(STATUS_POOL), "적용모델": random.choice(MODELS),
+            "개발상태": dev_st, "CL": cl, "적용모델": random.choice(MODELS),
             "변경점": f"[변경 전] 기존 {name.split()[0]} 동작 유지 → [변경 후] {name} 적용. 사유: 사용성 개선 및 VOC 대응. 영향: {dept} 모듈.",
             "목표시나리오": f"{dept} 사용 빈도 상위 시나리오 개선",
             "VOC건수": random.choice(["", str(random.randint(20, 4200))]),
@@ -76,7 +80,7 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             reregistered = prev_rejected.pop(0) if prev_rejected else None
         feats.append({
             "feature_index": idx, "name": name, "department": dept,
-            "dev_status": row["개발상태"], "row": row, "row_hash": h(json.dumps(row, ensure_ascii=False)),
+            "dev_status": dev_st, "row": row, "row_hash": h(json.dumps(row, ensure_ascii=False)),
             "status": status, "decision": decision,
             "decision_conditions": ["정량 근거 보완 후 재확인"] if decision == "conditional_go" else [],
             "slides": [f"{idx}_{k}.svg" for k in range(1, 4)] if i <= 12 else ([f"{idx}_1.svg"] if i % 3 else []),
