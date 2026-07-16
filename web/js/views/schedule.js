@@ -67,16 +67,19 @@ App.register("schedule", {
             <div class="card-head">${dk} <span class="sub">${ddLabel} · ${g.length}건${owners.length ? ` · 담당자 ${owners.length}명` : " · 담당자 없음"}</span>
               <button class="btn small" data-mail="${dk}" style="margin-left:auto">✉ 공지 메일 초안</button></div>
             <div class="card-body" style="overflow-x:auto">
-              <table class="tbl"><thead><tr><th>인덱스</th><th>기능명</th><th>변경점</th><th>개발일정</th><th>지연사유</th></tr></thead>
+              <table class="tbl" style="table-layout:fixed;width:100%">
+              <colgroup><col style="width:72px"><col style="width:128px"><col><col style="width:150px"><col style="width:168px"></colgroup>
+              <thead><tr><th>인덱스</th><th>기능명</th><th>변경점</th><th>개발일정</th><th>지연사유</th></tr></thead>
               <tbody>${g.map(({ f }) => {
                 const chg = changeCol ? cell(f, changeCol) : "";
                 const reason = reasonOf(f);
+                const clip = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
                 return `<tr>
                   <td class="idx">${f.feature_index}</td>
-                  <td>${esc(f.function_name)}</td>
-                  <td style="max-width:340px;font-size:11.5px;color:var(--text-2)" title="${esc(chg)}">${esc(chg.length > 80 ? chg.slice(0, 80) + "…" : chg)}</td>
-                  <td>${esc(cell(f, devCol))}${f.dev_delay ? ` <span class="badge b-nogo" title="${esc(f.dev_delay.from)} → ${esc(f.dev_delay.to)}">⏰ 지연</span>` : ""}</td>
-                  <td style="font-size:11.5px;${reason ? "color:var(--serious)" : "color:var(--text-3)"}">${esc(reason) || (f.dev_delay ? "미기재" : "—")}</td>
+                  <td style="${clip}" title="${esc(f.function_name)}">${esc(f.function_name)}</td>
+                  <td style="font-size:11.5px;color:var(--text-2);${clip}" title="${esc(chg)}">${esc(chg) || "—"}</td>
+                  <td style="white-space:nowrap">${esc(cell(f, devCol))}${f.dev_delay ? ` <span class="badge b-nogo" title="${esc(f.dev_delay.from)} → ${esc(f.dev_delay.to)}">⏰ 지연</span>` : ""}</td>
+                  <td style="font-size:11.5px;${clip};${reason ? "color:var(--serious)" : "color:var(--text-3)"}" title="${esc(reason)}">${esc(reason) || (f.dev_delay ? "미기재" : "—")}</td>
                 </tr>`;
               }).join("")}</tbody></table>
             </div></div>`;
