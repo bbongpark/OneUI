@@ -159,6 +159,7 @@
 | `columnPicker({cols, managed, newCols, onSaved})` | 관리 열 선택 창. |
 | `slideViewer(feature, plCheck)` | 슬라이드 좌우 뷰어(PL 지적 오버레이). |
 | `el(html)` / `fmtDate(s)` / `toast(msg, err)` | 유틸. |
+| `copyText(s)` / `copyRich(html, plain)` | 클립보드 복사. **secure context(localhost/https)면 navigator.clipboard, 사내 http면 execCommand 폴백** — 둘 다 지원해야 회사 배포에서 동작. |
 
 - **색 규칙**: P0=적, P1=호박, P2=회색, 리스크/미준비=경고색, **파랑=사람이 눌러야 할 곳**(AI 제안 대기).
 - **텍스트 배지 규칙**: 등급 딱지엔 P0/P1/P2/공유/보완만. 수정·확인·충돌 같은 플래그는 "판정 근거" 열로.
@@ -171,6 +172,7 @@
 - **dashboard**: KPI + 파이프라인 + 큐. KPI 드릴다운은 `drill: "stage:decided"` / `"cond:risk"` 접두사로 리뷰 보드 필터를 지정(§6 확장 레시피).
 - **review**: 테이블 + 단계/조건 필터 + 상세 모달 + 오버라이드 + PPT 매핑.
 - **meetings**: 달력(더블클릭=회의일, 클릭=표시) + 드래그 안건 배정 + SW담당 적중률 카드.
+- **schedule** (일정 관리): 개발 일정 임박 항목을 날짜별로 묶고 날짜별 공지 메일 초안 생성. 담당자 열(`schema_fields.dev_owner`)에서 `.com` 메일을 정규식으로 뽑아 `;` 연결. 복사는 `App.copyText`/`App.copyRich`(secure context면 navigator.clipboard, 사내 http면 execCommand 폴백).
 - **tracking / insight / query / personas / settings / notifications / logs**: MANUAL.md §3 참조.
 
 ---
@@ -237,6 +239,7 @@
 - **SW담당 예상**: `job_predict`가 **PL ready 안건만** 예측(자료 없으면 예측 근거 없음). 재실행 시 stale 예측 비움. 리뷰 보드 상세 모달 맨 아래에 예상+근거 표시.
 - **적중률 카드**: 큰 숫자 = 최근 5개 회의 **안건 수 가중 종합**(단순 평균 아님, detail.match 합산).
 - **AI 상세 조건부 표시**: 리뷰 보드 상세 모달에서 `ai_category`가 `config/excel_schema.json`의 `ai_detail.hide_values`(X·AI 없음 등)에 없으면 `ai_detail.columns`를 추가 섹션으로 표시. 열 이름·트리거 값 모두 config(하드코딩 금지). managed_columns와 별개 — 상세 표시 전용이라 AI 입력엔 안 들어가고 원본 행에서 직접 읽는다.
+- **일정 관리 화면(schedule)**: 개발 일정 임박 항목 날짜별 그룹 + 공지 메일 초안(수신자 `;` 연결 + 표). 담당자 열은 `schema_fields.dev_owner`(config), `.com` 메일만 추출. 복사는 `App.copyText`/`copyRich`(http 폴백 포함).
 
 ---
 

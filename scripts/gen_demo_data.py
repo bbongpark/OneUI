@@ -34,6 +34,8 @@ NAMES = [
     "PDF 스캔 문서 보정", "듀얼 메신저 알림 뱃지 구분", "라이브 캡션 다국어",
     "빅스비 루틴 추천 카드", "충전 완료 알림 사운드 설정"
 ]
+DEV_OWNERS = ["jh.kim@partner-dev.com", "yr.lee@partner-dev.com", "sw.park@partner-dev.com",
+              "mj.choi@partner-dev.com", "dh.jung@partner-dev.com", "hs.kang@partner-dev.com"]  # 개발담당자 메일
 STATUS_POOL = ["기획완료", "설계중", "구현중", "구현완료", "검증중", "검증완료"]
 MODELS = ["전 모델", "플래그십", "폴더블", "플래그십+폴더블"]
 AI_GRADES = ["P0", "P1", "P2"]                  # AI가 매기는 등급 (SHARE·DOC는 하드룰)
@@ -85,6 +87,8 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             "변경점": change,
             "VOC건수": random.choice(["", str(random.randint(20, 4200))]),
         }
+        # 개발 담당자 메일 — 개발 일정이 잡힌 항목에만. 셀에 1~2명이 공백으로 들어간다(.com 아이디).
+        row["개발담당자"] = " ".join(random.sample(DEV_OWNERS, random.randint(1, 2))) if dev_d else ""
         # AI 상세 열 — AI 관련 Feature에만 값이 있다(비AI는 빈칸). config/excel_schema.json의 ai_detail로 상세에 표시.
         is_ai = cat != "AI 없음"
         row.update({

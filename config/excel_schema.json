@@ -9,8 +9,10 @@
     "ai_category": "AI카테고리",
     "change_summary": "변경점",
     "ux_schedule": "UX일정",
-    "dev_schedule": "개발일정"
+    "dev_schedule": "개발일정",
+    "dev_owner": "개발담당자"
   },
+  "_dev_owner_comment": "개발 담당자 메일 열(선택). 일정 관리 화면이 공지 메일 수신자를 이 열에서 뽑는다 — 셀 값에서 '.com'으로 끝나는 토큰을 추출해 ;로 연결한다. 회사 실제 열 이름으로 교체.",
   "_dev_done_rule_comment": "개발 완료 판정 규칙. mode=filled: column에 값이 있으면 완료 (예: CL 열에 CL 번호). mode=values: column의 값이 values 중 하나면 완료. pattern(선택): 정규식으로 값 형식 검증. '-', 'TBD' 등 자리채움 값은 빈 값으로 본다. 설정 화면에서 편집.",
   "dev_done_rule": {
     "mode": "filled",

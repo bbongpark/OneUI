@@ -67,6 +67,7 @@ const App = {
       dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
       review: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
       meetings: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
+      schedule: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M12 2h0M5 4L3 6M19 4l2 2"/>',
       tracking: '<circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/>',
       insight: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
       query: '<path d="M21 11a8 8 0 1 0-3.3 6.5L21 20z"/>',
@@ -347,5 +348,35 @@ const App = {
     return h.split(/\n{2,}/).map(p => /^<(h|u|t|b)/.test(p.trim()) ? p : `<p>${p}</p>`).join("");
   },
 
-  fmtDate(s) { return (s || "").replace("T", " ").slice(0, 16); }
+  fmtDate(s) { return (s || "").replace("T", " ").slice(0, 16); },
+
+  // 클립보드 복사 — 사내 http(비 secure context)에서는 navigator.clipboard가 막히므로 execCommand로 폴백.
+  async copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0"; ta.style.top = "0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta); return ok;
+  },
+  // 서식 있는(표 포함) 복사 — 메일에 붙이면 표가 유지된다. 폴백은 contenteditable + execCommand.
+  async copyRich(html, plain) {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([plain], { type: "text/plain" }),
+      })]);
+      return true;
+    } catch (e) {}
+    const div = document.createElement("div");
+    div.contentEditable = "true"; div.innerHTML = html;
+    div.style.position = "fixed"; div.style.opacity = "0"; div.style.top = "0";
+    document.body.appendChild(div);
+    const range = document.createRange(); range.selectNodeContents(div);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    sel.removeAllRanges(); document.body.removeChild(div);
+    if (!ok) return this.copyText(plain);   // 그래도 안 되면 최소한 plain
+    return ok;
+  }
 };
