@@ -91,14 +91,14 @@ App.register("schedule", {
       const cols = ["인덱스", "기능명", "변경점", "개발일정", "지연사유"];
       const rowOf = f => [f.feature_index, f.function_name || "",
         (changeCol ? cell(f, changeCol) : ""), cell(f, devCol), reasonOf(f)];
-      // 메일에 붙여넣을 표 — 외부 CSS가 안 따라가므로 스타일을 전부 인라인으로.
-      const thBase = "padding:8px 11px;text-align:left;background:#33456b;color:#fff;font-weight:600;border:1px solid #33456b;white-space:nowrap";
-      const tdBase = "padding:7px 11px;border:1px solid #d7dde8;vertical-align:top";
-      const tableHtml = `<table style="border-collapse:collapse;width:100%;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;color:#1a2233">
+      // 메일에 붙여넣을 표 — 외부 CSS가 안 따라가므로 스타일 인라인. 색 강조 없이 검은색·무채색으로.
+      const thBase = "padding:8px 11px;text-align:left;background:#eeeeee;color:#000000;font-weight:700;border:1px solid #999999;white-space:nowrap";
+      const tdBase = "padding:7px 11px;border:1px solid #cccccc;vertical-align:top;color:#000000";
+      const tableHtml = `<table style="border-collapse:collapse;width:100%;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;color:#000000">
         <thead><tr>${cols.map(c => `<th style="${thBase}">${c}</th>`).join("")}</tr></thead>
-        <tbody>${list.map((f, ri) => `<tr style="background:${ri % 2 ? "#f6f8fb" : "#ffffff"}">${rowOf(f).map((v, ci) => {
+        <tbody>${list.map((f, ri) => `<tr style="background:${ri % 2 ? "#f7f7f7" : "#ffffff"}">${rowOf(f).map((v, ci) => {
           const extra = ci === 0 ? ";white-space:nowrap;font-weight:600" : ci === 2 ? ";min-width:240px" : ci === 3 ? ";white-space:nowrap" : "";
-          return `<td style="${tdBase}${extra}">${esc(v) || '<span style="color:#9aa5b8">—</span>'}</td>`;
+          return `<td style="${tdBase}${extra}">${esc(v) || '<span style="color:#999999">—</span>'}</td>`;
         }).join("")}</tr>`).join("")}</tbody></table>`;
       const tsv = [cols.join("\t"), ...list.map(f => rowOf(f).map(v => String(v).replace(/\s+/g, " ")).join("\t"))].join("\n");
       const topDefault = `안녕하세요.\n아래 기능들의 개발 일정이 ${dk}로 예정되어 있습니다. 일정 확인 및 준수 부탁드립니다.`;
