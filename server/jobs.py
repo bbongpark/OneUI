@@ -119,7 +119,7 @@ def job_review(job):
                 for r in out.get("results", []):
                     it = obj["items"].setdefault(r["feature_index"], {"personas": {}})
                     it["personas"][key] = {k: r.get(k) for k in
-                                           ("grade", "recommendation", "conditions", "rationale", "key_question", "status", "reason")}
+                                           ("grade", "rationale", "key_question", "status", "reason")}
                     ft = next((x for x in batch if x["feature_index"] == r["feature_index"]), None)
                     if ft:
                         it["input_hash"] = ft["row_hash"]
@@ -198,6 +198,7 @@ def job_schedule(job):
         raise RuntimeError("슬롯이 없습니다 — 회의 화면에서 슬롯을 먼저 추가하세요")
     reviews = store.load(store.dpath(v, "reviews.json"), {"items": {}})["items"]
     feats = _features(v)["features"]
+    # 대면 회의 대상은 P0·P1뿐 (P2=서면보고, SHARE=단순 공유, DOC=문서 보완 필요)
     cand = [f for f in feats if (reviews.get(f["feature_index"], {}).get("synthesis") or {}).get("final_grade") in ("P0", "P1")
             and f.get("decision") is None]
     est = engines.run("aux-duration-estimate", _prompt("aux-duration-estimate"),

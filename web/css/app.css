@@ -147,6 +147,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .b-p0 { background: var(--crit-bg); color: var(--crit); }
 .b-p1 { background: var(--warn-bg); color: var(--warn); }
 .b-p2 { background: var(--p2-bg); color: var(--p2); }
+.b-share { background: var(--good-bg); color: var(--good); }
+.b-doc { background: var(--serious-bg); color: var(--serious); }
 .b-go { background: var(--good-bg); color: var(--good); }
 .b-cgo { background: var(--warn-bg); color: var(--warn); }
 .b-defer { background: var(--p2-bg); color: var(--p2); }

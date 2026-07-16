@@ -13,16 +13,17 @@ App.register("review", {
     el.innerHTML = `
       <div class="page-head">
         <div><div class="page-title">리뷰 보드</div>
-        <div class="page-sub">부문별 권고 · 종합 판정(오버라이드 가능) · SW담당 예상 결정</div></div>
+        <div class="page-sub">부문별 등급 → 종합 등급 (오버라이드 가능) · 결정은 회의에서 · P0/P1만 대면 회의 대상</div></div>
         <div class="actions">
           <button class="btn" id="map-btn"></button>
-          <button class="btn" data-run="review">리뷰 실행</button><button class="btn" data-run="synthesis">종합만 재실행</button>
+          <button class="btn" data-run="review">리뷰 실행 (등급 분류)</button><button class="btn" data-run="synthesis">종합만 재실행</button>
         </div>
       </div>
       <div id="map-banner"></div>
       <div class="filterbar">
         <input type="search" id="f-q" placeholder="검색: 이름, 인덱스, 부서…">
-        <select id="f-grade"><option value="">등급 전체</option><option>P0</option><option>P1</option><option>P2</option></select>
+        <select id="f-grade"><option value="">등급 전체</option>
+          ${Object.entries(App.GRADES).map(([k, v]) => `<option value="${k}">${v.label} · ${v.full}</option>`).join("")}</select>
         <select id="f-dept"><option value="">부서 전체</option>${[...new Set(feats.map(f => f.department))].map(x => `<option>${x}</option>`).join("")}</select>
         <select id="f-state">
           <option value="">상태 전체</option><option value="needs_human">사람 확인 필요</option>
@@ -35,11 +36,13 @@ App.register("review", {
       </div>
       <div class="card"><div class="tbl-wrap" style="max-height:calc(100vh - 250px);overflow-y:auto">
         <table class="tbl"><thead><tr>
-          <th>인덱스</th><th>Feature</th><th>부서</th><th>부문 권고</th><th>종합</th><th>권고</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
+          <th>인덱스</th><th>Feature</th><th>부서</th><th>부문 등급</th><th>종합 등급</th><th>결정</th><th>예상 결정</th><th>PL</th><th>리스크</th><th>상태</th><th></th>
         </tr></thead><tbody id="rows"></tbody>
       </table></div></div>`;
 
     if (preset && preset !== "all") el.querySelector("#f-state").value = preset === "notready" ? "notready" : preset;
+    const gPreset = (location.hash.split("?g=")[1] || "");     // 현황판 등급 범례에서 넘어온 경우
+    if (gPreset && App.GRADES[gPreset]) el.querySelector("#f-grade").value = gPreset;
 
     const rows = el.querySelector("#rows");
     const draw = () => {
@@ -65,8 +68,9 @@ App.register("review", {
       rows.innerHTML = list.map(f => {
         const it = rv[f.feature_index] || {}, syn = it.synthesis || {}, plc = pl[f.feature_index] || {};
         const per = it.personas || {};
+        // 부문별 등급 — 각 부문이 이 건을 어떤 비중으로 봤는지
         const perHtml = Object.keys(P_LBL).map(k => per[k]
-          ? `<span class="badge ${{ go: "b-go", conditional_go: "b-cgo", defer: "b-defer", no_go: "b-nogo" }[per[k].recommendation]}" title="${P_LBL[k]}: ${per[k].rationale}">${P_LBL[k]}</span>`
+          ? `<span class="badge ${(App.GRADES[per[k].grade] || {}).cls || "b-outline"}" title="${P_LBL[k]}: ${(App.GRADES[per[k].grade] || {}).full || ""} — ${per[k].rationale}">${P_LBL[k]} ${(App.GRADES[per[k].grade] || {}).label || "?"}</span>`
           : `<span class="badge b-outline">${P_LBL[k]}</span>`).join(" ");
         const pred = predMap[f.feature_index];
         return `<tr class="clickable" data-idx="${f.feature_index}">
@@ -75,7 +79,7 @@ App.register("review", {
           <td>${f.department}</td>
           <td><div class="tag-row">${perHtml}</div></td>
           <td>${app.gradeBadge(syn.final_grade)}${it.override ? ' <span title="사람이 수정함 (' + it.override.by + ')">✍</span>' : ""}${syn.status === "needs_human" ? ' <span class="badge b-blue">확인</span>' : ""}${syn.divergent ? ' <span class="badge b-cgo" title="' + (syn.divergent_summary || "") + '">충돌</span>' : ""}</td>
-          <td>${app.recBadge(f.decision === "rejected" ? "rejected" : (f.decision || syn.final_recommendation))}</td>
+          <td>${f.decision ? app.recBadge(f.decision === "rejected" ? "rejected" : f.decision) : '<span class="badge b-outline">회의 전</span>'}</td>
           <td>${f.decision ? '<span class="badge b-outline" title="실제 결정 확정됨">확정</span>' : pred ? app.recBadge(pred.predicted_decision) + `<span style="font-size:10px;color:var(--text-3)"> ${pred.confidence}</span>` : '<span class="badge b-outline">—</span>'}</td>
           <td>${plc.ready === true ? '<span class="badge b-go">준비</span>' : plc.ready === false ? '<span class="badge b-nogo" title="' + [(plc.doc_issues || []).join(", "), (plc.slide_issues || []).map(x => "슬라이드" + x.slide + ": " + x.issue).join(", ")].filter(Boolean).join(" · ") + '">미준비</span>' : '<span class="badge b-outline">—</span>'}</td>
           <td>${(r => `<span class="badge b-risk-${r.level}" title="${r.reason}">${{ high: "높음", caution: "주의", normal: "정상", unknown: "미확인" }[r.level]}</span>`)(app.scheduleRisk(f))}</td>
@@ -109,30 +113,30 @@ App.register("review", {
           ${f.reregistered_from ? `<dt>재등록</dt><dd><span class="badge b-violet">${f.reregistered_from}에서 거절/보류 → 재등록</span></dd>` : ""}
           ${f.decision ? `<dt>임원 결정</dt><dd>${app.recBadge(f.decision === "rejected" ? "rejected" : f.decision)} ${(f.decision_conditions || []).join(", ")}</dd>` : ""}
         </div>
-        <div class="section-label">부문별 리뷰</div>
+        <div class="section-label">부문별 등급</div>
         <div class="persona-scores">
           ${Object.entries({ experience_planning: "경험기획", ux: "UX", dev: "개발", cxi: "CXI" }).map(([k, lbl]) => per[k] ? `
-            <div class="pscore"><div class="ph"><span>${lbl}</span><span>${app.gradeBadge(per[k].grade)} ${app.recBadge(per[k].recommendation)}</span></div>
+            <div class="pscore"><div class="ph"><span>${lbl}</span><span>${app.gradeBadge(per[k].grade)}</span></div>
             <div class="rat">${per[k].rationale}</div>
             ${per[k].key_question ? `<div class="rat" style="color:var(--accent)">Q. ${per[k].key_question}</div>` : ""}</div>` :
             `<div class="pscore"><div class="ph"><span>${lbl}</span><span class="badge b-outline">미실행</span></div></div>`).join("")}
         </div>
-        <div class="section-label">종합 판정</div>
+        <div class="section-label">종합 등급</div>
         ${syn.final_grade ? `
-          <div class="pscore"><div class="ph"><span>${app.gradeBadge(syn.final_grade)} ${app.recBadge(syn.final_recommendation)}</span>
+          <div class="pscore"><div class="ph"><span>${app.gradeBadge(syn.final_grade)}
+            <span style="font-weight:400;color:var(--text-2);font-size:11.5px">${(App.GRADES[syn.final_grade] || {}).full || ""}</span></span>
             ${syn.status === "needs_human" ? '<span class="badge b-blue">사람 확인 필요</span>' : ""}</div>
           <div class="rat">${syn.rationale || ""}</div>
           ${syn.divergent ? `<div class="rat" style="color:var(--serious)">⚡ ${syn.divergent_summary}</div>` : ""}
-          ${(syn.meeting_questions || []).map(q => `<div class="rat" style="color:var(--accent)">회의 질문: ${q}</div>`).join("")}
-          ${(syn.merged_conditions || []).length ? `<div class="rat">조건: ${syn.merged_conditions.join(" · ")}</div>` : ""}</div>` :
-          '<div class="empty" style="padding:14px 0">종합 판정 없음</div>'}
+          ${(syn.meeting_questions || []).map(q => `<div class="rat" style="color:var(--accent)">회의 질문: ${q}</div>`).join("")}</div>` :
+          '<div class="empty" style="padding:14px 0">종합 등급 없음 — ② 리뷰 실행 필요</div>'}
         ${(it.history || []).length ? `<div class="section-label">수정 이력</div>` +
           it.history.map(h => `<div style="font-size:11.5px;color:var(--text-2);padding:2px 0">· ${App.fmtDate(h.at)} <b>${h.by}</b>: ${h.field} ${h.from || "—"} → ${h.to} (${h.reason || "사유 없음"})</div>`).join("") : ""}
       `);
       const foot = [];
       if (!readonly && syn.final_grade && !f.decision) {
         const btn = document.createElement("button");
-        btn.className = "btn primary"; btn.textContent = "판정 수정 (오버라이드)";
+        btn.className = "btn primary"; btn.textContent = "등급 수정 (오버라이드)";
         btn.onclick = () => { back.remove(); openOverride(f, it, syn); };
         foot.push(btn);
       }
@@ -147,10 +151,11 @@ App.register("review", {
 
     const openOverride = (f, it, syn) => {
       const body = App.el(`
-        <p style="color:var(--text-2);font-size:12.5px;margin-bottom:12px">AI 판정: ${app.gradeBadge(syn.final_grade)} ${app.recBadge(syn.final_recommendation)} — 수정하면 원값과 수정자가 이력에 남습니다.</p>
+        <p style="color:var(--text-2);font-size:12.5px;margin-bottom:12px">AI 등급: ${app.gradeBadge(syn.final_grade)}
+          ${(App.GRADES[syn.final_grade] || {}).full || ""} — 수정하면 원값과 수정자가 이력에 남습니다.</p>
         <div class="kv" style="grid-template-columns:90px 1fr">
-          <dt>등급</dt><dd><select id="ov-grade"><option value="">유지</option><option>P0</option><option>P1</option><option>P2</option></select></dd>
-          <dt>권고</dt><dd><select id="ov-rec"><option value="">유지</option><option value="go">진행</option><option value="conditional_go">조건부</option><option value="defer">보류</option><option value="no_go">반대</option></select></dd>
+          <dt>등급</dt><dd><select id="ov-grade"><option value="">유지</option>
+            ${Object.entries(App.GRADES).map(([k, v]) => `<option value="${k}">${v.label} · ${v.full}</option>`).join("")}</select></dd>
           <dt>사유</dt><dd><input id="ov-reason" placeholder="수정 사유 (필수)" style="width:100%"></dd>
         </div>`);
       const ok = document.createElement("button");
@@ -162,14 +167,13 @@ App.register("review", {
           await app.api("/api/override", {
             version: app.state.version, feature_index: f.feature_index,
             final_grade: body.querySelector("#ov-grade").value || null,
-            final_recommendation: body.querySelector("#ov-rec").value || null,
             reason, user: app.state.user.name, base_rev: d.reviews.rev, resolve: true
           });
           app.toast("판정이 수정되었습니다");
           back.remove(); await app.reload(); app.route();
         } catch (e) { app.toast(e.message === "conflict" ? "다른 사용자가 먼저 수정했습니다 — 새로고침 후 다시 시도하세요" : e.message, true); }
       };
-      const back = app.modal({ title: `판정 수정 — ${f.feature_index}`, body, foot: [ok] });
+      const back = app.modal({ title: `등급 수정 — ${f.feature_index}`, body, foot: [ok] });
     };
 
     el.querySelectorAll("[data-run]").forEach(b => b.onclick = () => app.run(b.dataset.run));

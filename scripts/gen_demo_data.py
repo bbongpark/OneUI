@@ -35,8 +35,9 @@ NAMES = [
 ]
 STATUS_POOL = ["기획완료", "설계중", "구현중", "구현완료", "검증중", "검증완료"]
 MODELS = ["전 모델", "플래그십", "폴더블", "플래그십+폴더블"]
-GRADES = ["P0", "P1", "P2"]
-RECS = ["go", "conditional_go", "defer", "no_go"]
+GRADES = ["P0", "P1", "P2", "SHARE", "DOC"]     # 리뷰 등급 5단계
+G_ORDER = {g: i for i, g in enumerate(["DOC", "P0", "P1", "P2", "SHARE"])}
+RECS = ["go", "conditional_go", "defer", "no_go"]   # 회의 결정용
 PERSONAS = ["experience_planning", "ux", "dev", "cxi"]
 P_LABEL = {"experience_planning": "경험기획", "ux": "UX", "dev": "개발", "cxi": "CXI"}
 
@@ -97,30 +98,31 @@ def make_version(ver, n, reviewed_ratio, decided_ratio, prev_rejected=None):
             done = PERSONAS if st_reviewed else PERSONAS[: random.randint(1, 3)]
             pr = {}
             for p in done:
-                g = random.choices(GRADES, weights=[15, 45, 40])[0]
-                pr[p] = {"grade": g, "recommendation": random.choices(RECS, weights=[50, 25, 15, 10])[0],
-                         "conditions": [], "rationale": random.choice(RATIONALES[p]),
+                g = random.choices(GRADES, weights=[12, 34, 30, 16, 8])[0]
+                pr[p] = {"grade": g, "rationale": random.choice(RATIONALES[p]),
                          "key_question": random.choice(KEYQ), "status": "ok"}
             entry = {"personas": pr, "prompt_hash": "a1b2c3", "input_hash": h(idx + "in")}
             if st_reviewed:
                 grades = [v["grade"] for v in pr.values()]
-                fg = "P0" if "P0" in grades else ("P1" if "P1" in grades else "P2")
-                recs = {v["recommendation"] for v in pr.values()}
-                div = len(recs) > 1 and ("no_go" in recs or "defer" in recs) and "go" in recs
-                needs_h = random.random() < 0.06
+                # 우선순위: DOC > P0 > P1 > P2 > SHARE (SHARE는 만장일치일 때만)
+                fg = min(grades, key=lambda g: G_ORDER[g])
+                if fg == "SHARE" and not all(g == "SHARE" for g in grades):
+                    fg = "P2"
+                spread = max(G_ORDER[g] for g in grades) - min(G_ORDER[g] for g in grades)
+                div = spread >= 2
+                needs_h = div and random.random() < 0.15
                 entry["synthesis"] = {
-                    "final_grade": fg, "final_recommendation": ("conditional_go" if div else list(recs)[0]),
-                    "merged_conditions": ["VOC 정량 근거 보완"] if div else [],
+                    "final_grade": fg,
                     "divergent": div,
-                    "divergent_summary": "개발 defer vs 기획 go — 일정 실현성 쟁점" if div else "",
-                    "rationale": "부문 간 권고 차이의 핵심은 일정 실현성" if div else "부문 권고 일치, 근거 충분",
+                    "divergent_summary": "부문 간 등급이 %s로 갈림" % "/".join(sorted(set(grades))) if div else "",
+                    "rationale": "부문 간 등급 차이가 커 회의에서 인식 정렬 필요" if div else "부문 등급 일치, 근거 충분",
                     "meeting_questions": [q for q in random.sample(KEYQ[:5], 2)],
                     "status": "needs_human" if needs_h else "ok",
-                    "reason": "부문 권고가 정면 충돌하며 근거가 모두 타당" if needs_h else "",
+                    "reason": "부문 등급이 정면 충돌하며 근거가 모두 타당" if needs_h else "",
                 }
                 if random.random() < 0.08:
                     entry["override"] = {"field": "final_grade", "from": fg,
-                                         "to": random.choice([g for g in GRADES if g != fg]),
+                                         "to": random.choice([g for g in ("P0", "P1", "P2") if g != fg]),
                                          "by": "관리자", "reason": "전략 과제로 상향", "at": NOW + "T10:20:00"}
             reviews[idx] = entry
         if st_reviewed:

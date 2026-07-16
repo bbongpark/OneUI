@@ -18,7 +18,9 @@ App.register("dashboard", {
     const decided = alive.filter(f => f.status === "decided");
     const rejectedN = feats.length - alive.length;
     const dist = g => reviewed.filter(f => rv[f.feature_index].synthesis.final_grade === g).length;
-    const p0 = dist("P0"), p1 = dist("P1"), p2 = dist("P2");
+    const GC = { P0: "var(--crit)", P1: "var(--warn)", P2: "var(--p2)", SHARE: "var(--good)", DOC: "var(--serious)" };
+    const gdist = Object.keys(App.GRADES).map(g => ({ g, n: dist(g), ...App.GRADES[g], color: GC[g] }));
+    const docN = dist("DOC");
     const decDist = k => decided.filter(f => f.decision === k).length;
     const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
     const readonly = d.features.readonly;
@@ -42,8 +44,8 @@ App.register("dashboard", {
         <div class="page-sub">One UI ${app.state.version} · 전체 ${feats.length}건 · 통계 모수 ${alive.length}건 (거절 ${rejectedN}건 제외)${readonly ? " · 읽기 전용" : ""}</div></div>
         <div class="actions">
           <button class="btn primary" id="ingest-btn">① 인입 (엑셀·PPT 업로드)</button>
-          <button class="btn" data-run="review">② 리뷰 실행</button>
-          <button class="btn" data-run="pl">③ PL 검사</button>
+          <button class="btn" data-run="review" title="엑셀 기준으로 P0/P1/P2/단순 공유/문서 보완 5등급 분류 → 종합까지 자동">② 리뷰 실행 (등급 분류)</button>
+          <button class="btn" data-run="pl" title="PL이 발표자료(PPT) 완성도를 평가 — PPT 매핑 확정 후 실행 가능">③ PL 검사 (발표자료 평가)</button>
           <button class="btn" data-run="insight">⑦ 인사이트</button>
           <button class="btn" data-run="selftest">엔진 자가진단</button>
         </div>
@@ -52,8 +54,8 @@ App.register("dashboard", {
       <div class="card" style="margin-bottom:14px"><div class="card-body">
         <div class="pipeline">
           <div class="pipe-step ${stageCls(ing, !ing)}"><div class="t">① 인입</div><div class="d">${alive.length}건 · 슬라이드 매핑</div></div>
-          <div class="pipe-step ${stageCls(revDone, ing && !revDone)}"><div class="t">② 리뷰</div><div class="d">${reviewed.length}/${alive.length} 종합 완료</div></div>
-          <div class="pipe-step ${stageCls(plDone && reviewed.length > 0, revDone && !plDone)}"><div class="t">③ PL 검사</div><div class="d">${plChecked.length}건 · 준비 ${plReady.length}</div></div>
+          <div class="pipe-step ${stageCls(revDone, ing && !revDone)}"><div class="t">② 리뷰 (등급)</div><div class="d">${reviewed.length}/${alive.length} 종합 완료${docN ? ` · 보완 ${docN}` : ""}</div></div>
+          <div class="pipe-step ${stageCls(plDone && reviewed.length > 0, revDone && !plDone)}"><div class="t">③ PL (발표자료)</div><div class="d">${plChecked.length}건 · 준비 ${plReady.length}</div></div>
           <div class="pipe-step ${stageCls(!!schedDone, plDone && !schedDone)}"><div class="t">④ 일정·예상</div><div class="d">${schedDone ? "배정됨" : "대기"}</div></div>
           <div class="pipe-step ${stageCls(decided.length > 0, !!schedDone && !decided.length)}"><div class="t">⑤ 회의</div><div class="d">결정 ${decided.length}건</div></div>
           <div class="pipe-step ${stageCls(false, decided.length > 0)}"><div class="t">⑥ PLM·추적</div><div class="d">액션 ${d.actions.items.length}건</div></div>
@@ -84,18 +86,14 @@ App.register("dashboard", {
       </div>
 
       <div class="grid" style="grid-template-columns: 1.2fr 1fr; align-items:start">
-        <div class="card"><div class="card-head">종합 판정 분포 <span class="sub">리뷰 완료 ${reviewed.length}건 기준</span></div>
+        <div class="card"><div class="card-head">리뷰 등급 분포 <span class="sub">리뷰 완료 ${reviewed.length}건 기준 · 클릭하면 목록</span></div>
           <div class="card-body">
             ${reviewed.length ? `
             <div class="stackbar">
-              ${p0 ? `<i style="flex:${p0};background:var(--crit)" title="P0 ${p0}건"></i>` : ""}
-              ${p1 ? `<i style="flex:${p1};background:var(--warn)" title="P1 ${p1}건"></i>` : ""}
-              ${p2 ? `<i style="flex:${p2};background:var(--p2)" title="P2 ${p2}건"></i>` : ""}
+              ${gdist.filter(x => x.n).map(x => `<i style="flex:${x.n};background:${x.color}" title="${x.full} ${x.n}건"></i>`).join("")}
             </div>
             <div class="legend">
-              <span><span class="sw" style="background:var(--crit)"></span>P0 임원 최우선 <b>${p0}</b></span>
-              <span><span class="sw" style="background:var(--warn)"></span>P1 대면 결정 <b>${p1}</b></span>
-              <span><span class="sw" style="background:var(--p2)"></span>P2 서면보고 <b>${p2}</b></span>
+              ${gdist.map(x => `<span data-drill="g:${x.g}" style="cursor:pointer"><span class="sw" style="background:${x.color}"></span>${x.full} <b>${x.n}</b></span>`).join("")}
             </div>
             <div class="section-label">부서별 리뷰 현황</div>
             <div id="dept-bars"></div>` : `<div class="empty">아직 종합 판정이 없습니다 — 리뷰를 실행하세요</div>`}
@@ -130,6 +128,10 @@ App.register("dashboard", {
     el.querySelectorAll("[data-drill]").forEach(k => k.onclick = () => {
       const t = k.dataset.drill;
       location.hash = t === "settings" ? "#/settings" : t === "dvr" ? "#/meetings" : "#/review?f=" + t;
+    });
+    // 등급 범례 클릭 → 그 등급만 필터
+    el.querySelectorAll('[data-drill^="g:"]').forEach(x => x.onclick = () => {
+      location.hash = "#/review?g=" + x.dataset.drill.slice(2);
     });
 
     // ── ① 인입 업로드 모달 ──

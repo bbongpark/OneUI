@@ -150,7 +150,18 @@ const App = {
   el(html) { const d = document.createElement("div"); d.innerHTML = html; return d; },
 
   // ── 도메인 배지 ──
-  gradeBadge(g) { return g ? `<span class="badge b-${g.toLowerCase()}">${g}</span>` : '<span class="badge b-outline">—</span>'; },
+  // 리뷰 등급 5단계 — 리뷰의 유일한 산출물 (진행/중단 권고는 리뷰가 하지 않는다)
+  GRADES: {
+    P0: { label: "P0", full: "최우선 대면", cls: "b-p0" },
+    P1: { label: "P1", full: "대면", cls: "b-p1" },
+    P2: { label: "P2", full: "서면보고", cls: "b-p2" },
+    SHARE: { label: "공유", full: "단순 공유", cls: "b-share" },
+    DOC: { label: "보완", full: "문서 보완 필요", cls: "b-doc" }
+  },
+  gradeBadge(g) {
+    const d = this.GRADES[g];
+    return d ? `<span class="badge ${d.cls}" title="${d.full}">${d.label}</span>` : '<span class="badge b-outline">—</span>';
+  },
   recBadge(r) {
     const m = { go: ["b-go", "진행"], conditional_go: ["b-cgo", "조건부"], defer: ["b-defer", "보류"], no_go: ["b-nogo", "반대"], rejected: ["b-rejected", "거절"] };
     return r && m[r] ? `<span class="badge ${m[r][0]}">${m[r][1]}</span>` : '<span class="badge b-outline">—</span>';
