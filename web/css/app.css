@@ -254,6 +254,25 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .dropzone .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; }
 .step-num { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; margin-right: 7px; }
 
+/* 달력 — 슬롯이 있는 날을 표시하고 클릭하면 그 날의 슬롯을 연다 */
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal .dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-3); padding: 2px 0; }
+.cal .dow.sun { color: var(--crit); } .cal .dow.sat { color: var(--accent); }
+.cal .day { min-height: 62px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 6px; background: var(--surface); font-size: 11.5px; display: flex; flex-direction: column; gap: 3px; transition: all .12s; }
+.cal .day.pad { border-color: transparent; background: transparent; }
+.cal .day.has { cursor: pointer; border-color: var(--accent); background: var(--accent-bg); }
+.cal .day.has:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.cal .day.sel { border-color: var(--accent); border-width: 2px; background: var(--accent-bg); }
+.cal .day .d { font-weight: 700; color: var(--text-2); }
+.cal .day.has .d { color: var(--accent); }
+.cal .day .pill { font-size: 10px; padding: 1px 5px; border-radius: 5px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal .day.has .pill { background: var(--surface); color: var(--accent); font-weight: 600; }
+.cal .day .pill.over { background: var(--crit-bg); color: var(--crit); }
+.cal .day .dvr { font-size: 9.5px; color: var(--crit); font-weight: 700; }
+.cal .day .ms { font-size: 9.5px; color: var(--violet); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.cal-head .mon { font-weight: 700; font-size: 14px; min-width: 100px; }
+
 /* 저장 바 — 콘텐츠 하단에 붙는 불투명 푸터 (스크롤 중에도 내용과 겹치지 않음) */
 .save-bar { position: sticky; bottom: -40px; z-index: 5; display: flex; align-items: center; gap: 12px;
   margin: 16px -26px -40px; padding: 14px 26px; background: var(--surface); border-top: 1px solid var(--border); }

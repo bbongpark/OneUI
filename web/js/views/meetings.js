@@ -19,74 +19,157 @@ App.register("meetings", {
       </div>
       ${sched.warning ? `<div class="warn-banner">⚠ ${sched.warning}</div>` : ""}
 
-      <div class="grid" style="grid-template-columns: 2fr 1fr; align-items:start">
-        <div>
-          <div class="card" style="margin-bottom:14px"><div class="card-head">회의 슬롯 <span class="sub">회의 시간은 매번 다름 — 슬롯을 직접 추가/삭제 · 항목 클릭: 이동/취소/소요시간 수정 · ★=후속 보고</span></div>
-            <div class="card-body">
-            ${readonly ? "" : `<div class="filterbar" style="margin-bottom:12px">
-              <input type="date" id="s-date">
-              <input type="time" id="s-time" value="10:00" step="600">
-              <select id="s-cap"><option value="60">60분</option><option value="90">90분</option><option value="120">120분</option><option value="30">30분</option></select>
-              <button class="btn" id="s-add">+ 슬롯 추가</button>
-            </div>`}
-            <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))" id="slots"></div>
-            ${(sched.unassigned || []).length ? `<div class="warn-banner" style="margin-top:12px">미배정 ${sched.unassigned.length}건: ${sched.unassigned.join(", ")} — 슬롯 부족, 수동 조정 필요</div>` : ""}</div>
-          </div>
-          <div class="card"><div class="card-head">회의록 <span class="sub">붙여넣기 → AI 추출 → 사람 확인 후 확정</span></div>
-            <div class="card-body" id="meetings-box"></div>
-          </div>
-        </div>
-        <div>
-          <div class="card" style="margin-bottom:14px"><div class="card-head">과제 일정
-            <span class="sub">DVR = 개발 일정 리스크 판정 기준일</span></div>
-            <div class="card-body">
-              <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px">
-                <b style="font-size:13px;color:var(--accent)">DVR</b>
-                ${readonly || !admin ? `<span style="font-family:var(--mono);font-size:13px">${sched.dvr || "미설정"}</span>`
-                  : `<input type="date" id="dvr-in" value="${sched.dvr || ""}" style="flex:1">
-                     <button class="btn small primary" id="dvr-save">저장</button>`}
-              </div>
+      <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:stretch; margin-bottom:14px">
+        <div class="card"><div class="card-head">과제 일정
+          <span class="sub">DVR = 개발 일정 리스크 판정 기준일</span></div>
+          <div class="card-body" style="display:flex;gap:18px;align-items:flex-start">
+            <div style="flex:0 0 auto;min-width:190px">
+              <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">DVR</div>
+              ${readonly || !admin ? `<div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--accent)">${sched.dvr || "미설정"}</div>`
+                : `<div style="display:flex;gap:6px"><input type="date" id="dvr-in" value="${sched.dvr || ""}" style="flex:1">
+                   <button class="btn small primary" id="dvr-save">저장</button></div>`}
+              <p style="font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5">개발 일정이 이 날짜를 넘으면<br>일정 리스크로 판정됩니다.</p>
+            </div>
+            <div style="flex:1;min-width:0;border-left:1px solid var(--border);padding-left:16px">
+              <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">마일스톤 <span style="font-weight:400;text-transform:none">— PL 검사 참고 자료</span></div>
               <div id="ms-list">${(sched.milestones || []).map((m, i) => `
-                <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px dashed var(--border);font-size:12.5px">
-                  <span style="flex:1">${m.name}</span>
+                <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px dashed var(--border);font-size:12.5px">
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.name}</span>
                   <b style="font-family:var(--mono);font-size:12px">${m.date}</b>
                   ${admin && !readonly ? `<button class="btn ghost small" data-msdel="${i}" style="padding:0 5px">✕</button>` : ""}
                 </div>`).join("") || '<div style="font-size:12px;color:var(--text-3);padding:4px 0">마일스톤 없음</div>'}</div>
               ${admin && !readonly ? `<div style="display:flex;gap:6px;margin-top:8px">
-                <input id="ms-name" placeholder="마일스톤 이름" style="flex:1">
-                <input type="date" id="ms-date" style="width:140px">
+                <input id="ms-name" placeholder="마일스톤 이름" style="flex:1;min-width:0">
+                <input type="date" id="ms-date" style="width:135px">
                 <button class="btn small" id="ms-add">추가</button></div>` : ""}
-              <p style="font-size:11px;color:var(--text-3);margin-top:8px">개발 일정이 DVR을 넘으면 일정 리스크로 판정됩니다. 마일스톤은 PL 검사의 참고 자료입니다.</p>
-            </div>
-          </div>
-          <div class="card"><div class="card-head">SW담당 예상 적중률</div>
-            <div class="card-body">
-              ${stats.length ? `<div class="acc-chart">${stats.slice(0, 8).reverse().map(r =>
-                `<div class="bar" style="height:${r.accuracy}%" title="${r.meeting_id} · ${r.n}건"><span>${r.accuracy}%</span></div>`).join("")}</div>
-                <p style="font-size:11px;color:var(--text-3);margin-top:6px">회의 확정 시 자동 측정 · 회의록이 쌓일수록 페르소나를 보강하세요</p>`
-                : '<div class="empty">아직 측정 없음 — 회의 확정 시 자동 기록</div>'}
             </div>
           </div>
         </div>
+        <div class="card"><div class="card-head">SW담당 예상 적중률
+          <span class="sub">회의 확정 시 자동 측정 — 예상 vs 실제 결정</span></div>
+          <div class="card-body">
+            ${stats.length ? `<div style="display:flex;gap:18px;align-items:flex-start">
+                <div style="flex:0 0 auto">
+                  <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:var(--accent)">${stats[0].accuracy}%</div>
+                  <div style="font-size:11.5px;color:var(--text-2)">최근 ${stats[0].n}건 · ${stats[0].meeting_id}</div>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div class="acc-chart" style="height:70px">${stats.slice(0, 10).reverse().map(r =>
+                    `<div class="bar" style="height:${Math.max(r.accuracy, 4)}%" title="${r.meeting_id} · ${r.n}건 · ${r.accuracy}%"><span>${r.accuracy}</span></div>`).join("")}</div>
+                  <p style="font-size:11px;color:var(--text-3);margin-top:4px">회의록이 쌓일수록 SW담당 페르소나의 판단 성향을 보강하세요</p>
+                </div>
+              </div>`
+              : '<div class="empty" style="padding:20px 0">아직 측정 없음 — 회의록을 확정하면 예상과 실제를 비교해 기록합니다</div>'}
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px"><div class="card-head">회의 슬롯
+        <span class="sub">회의 시간은 매번 다름 — 슬롯을 직접 추가/삭제 · 날짜를 클릭하면 그 날의 안건이 열립니다 · ★=후속 보고</span></div>
+        <div class="card-body">
+          ${readonly ? "" : `<div class="filterbar" style="margin-bottom:12px">
+            <input type="date" id="s-date">
+            <input type="time" id="s-time" value="10:00" step="600">
+            <select id="s-cap"><option value="60">60분</option><option value="90">90분</option><option value="120">120분</option><option value="30">30분</option></select>
+            <button class="btn" id="s-add">+ 슬롯 추가</button>
+            <span class="count" id="slot-sum"></span>
+          </div>`}
+          <div class="grid" style="grid-template-columns: 1.15fr 1fr; align-items:start">
+            <div>
+              <div class="cal-head">
+                <button class="btn ghost small" id="cal-prev">◀</button>
+                <span class="mon" id="cal-mon"></span>
+                <button class="btn ghost small" id="cal-next">▶</button>
+                <button class="btn ghost small" id="cal-today">오늘</button>
+                <span style="margin-left:auto;font-size:11px;color:var(--text-3)">
+                  <span class="badge b-blue">슬롯</span> <span class="badge b-nogo">DVR</span> <span class="badge b-violet">마일스톤</span></span>
+              </div>
+              <div class="cal" id="cal"></div>
+            </div>
+            <div id="day-panel"></div>
+          </div>
+          ${(sched.unassigned || []).length ? `<div class="warn-banner" style="margin-top:12px">미배정 ${sched.unassigned.length}건: ${sched.unassigned.join(", ")} — 슬롯 부족, 수동 조정 필요</div>` : ""}
+        </div>
+      </div>
+      <div class="card"><div class="card-head">회의록 <span class="sub">붙여넣기 → AI 추출 → 사람 확인 후 확정</span></div>
+        <div class="card-body" id="meetings-box"></div>
       </div>`;
 
-    // ── 슬롯 렌더 ──
-    const slotBox = el.querySelector("#slots");
-    slotBox.innerHTML = (sched.slots || []).map((s, si) => {
-      const used = s.items.reduce((a, i) => a + i.est_min, 0);
-      return `<div class="slot ${used > s.capacity_min ? "over" : ""}">
-        <div class="slot-head"><span>${s.date} ${s.time}</span><span class="cap">${used}/${s.capacity_min}분
-          ${readonly ? "" : `<button class="btn ghost small" data-del-slot="${s.date}|${s.time}" title="슬롯 삭제 (안건은 미배정으로 이동)" style="padding:0 5px">✕</button>`}</span></div>
-        ${s.items.map(i => {
-          const f = fmap[i.feature_index] || { name: i.feature_index };
-          return `<div class="slot-item" data-si="${si}" data-idx="${i.feature_index}" style="cursor:pointer" title="클릭: 조정">
-            ${i.followup ? "★ " : ""}<span class="idx" style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">${i.feature_index}</span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
-            ${i.predicted ? app.recBadge(i.predicted.predicted_decision) : ""}
-            <span class="est">${i.est_min}분</span></div>`;
-        }).join("") || '<div style="color:var(--text-3);font-size:11.5px;padding:4px">비어 있음</div>'}
-      </div>`;
-    }).join("") || '<div class="empty">슬롯이 없습니다 — 위에서 날짜·시각·시간을 정해 슬롯을 추가한 뒤 배정을 실행하세요</div>';
+    // ── 달력 + 날짜별 슬롯 패널 ──
+    const slots = sched.slots || [];
+    const byDate = {};
+    slots.forEach(s => (byDate[s.date] = byDate[s.date] || []).push(s));
+    const msByDate = {};
+    (sched.milestones || []).forEach(m => (msByDate[m.date] = msByDate[m.date] || []).push(m.name));
+    const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    const dates = Object.keys(byDate).sort();
+    // 슬롯이 있는 첫 달을 기본으로, 선택은 첫 슬롯 날짜
+    let sel = app._meetSel && byDate[app._meetSel] ? app._meetSel : dates[0] || iso(new Date());
+    let calMon = new Date(sel + "T00:00:00");     // 달력에 표시 중인 달 (openItem의 cur과 혼동 금지)
+    calMon.setDate(1);
+
+    const totalMin = slots.reduce((a, s) => a + s.items.reduce((x, i) => x + i.est_min, 0), 0);
+    const totalItems = slots.reduce((a, s) => a + s.items.length, 0);
+    const sum = el.querySelector("#slot-sum");
+    if (sum) sum.textContent = `슬롯 ${slots.length}개 · 안건 ${totalItems}건 · ${totalMin}분`;
+
+    el.querySelector("#cal-prev").onclick = () => { calMon.setMonth(calMon.getMonth() - 1); drawCal(); };
+    el.querySelector("#cal-next").onclick = () => { calMon.setMonth(calMon.getMonth() + 1); drawCal(); };
+    el.querySelector("#cal-today").onclick = () => { calMon = new Date(); calMon.setDate(1); drawCal(); };
+
+    const drawCal = () => {
+      el.querySelector("#cal-mon").textContent = `${calMon.getFullYear()}년 ${calMon.getMonth() + 1}월`;
+      const first = new Date(calMon.getFullYear(), calMon.getMonth(), 1);
+      const last = new Date(calMon.getFullYear(), calMon.getMonth() + 1, 0);
+      const cells = [];
+      ["일", "월", "화", "수", "목", "금", "토"].forEach((w, i) =>
+        cells.push(`<div class="dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</div>`));
+      for (let i = 0; i < first.getDay(); i++) cells.push('<div class="day pad"></div>');
+      for (let dnum = 1; dnum <= last.getDate(); dnum++) {
+        const ds = iso(new Date(calMon.getFullYear(), calMon.getMonth(), dnum));
+        const ss = byDate[ds] || [];
+        const isDvr = sched.dvr === ds;
+        const ms = msByDate[ds] || [];
+        const over = ss.some(s => s.items.reduce((a, i) => a + i.est_min, 0) > s.capacity_min);
+        cells.push(`<div class="day ${ss.length ? "has" : ""} ${sel === ds && ss.length ? "sel" : ""}" ${ss.length ? `data-day="${ds}"` : ""}>
+          <span class="d">${dnum}</span>
+          ${ss.length ? `<span class="pill ${over ? "over" : ""}">${ss.length}개 · ${ss.reduce((a, s) => a + s.items.length, 0)}건</span>` : ""}
+          ${isDvr ? '<span class="dvr">DVR</span>' : ""}
+          ${ms.map(n => `<span class="ms" title="${n}">◆ ${n}</span>`).join("")}
+        </div>`);
+      }
+      el.querySelector("#cal").innerHTML = cells.join("");
+      el.querySelectorAll("[data-day]").forEach(c => c.onclick = () => {
+        sel = c.dataset.day; app._meetSel = sel; drawCal(); drawDay();
+      });
+    };
+
+    const drawDay = () => {
+      const ss = byDate[sel] || [];
+      const panel = el.querySelector("#day-panel");
+      if (!ss.length) {
+        panel.innerHTML = `<div class="empty">${slots.length ? "달력에서 파란 날짜를 클릭하세요" : "슬롯이 없습니다 — 위에서 날짜·시각·길이를 정해 추가한 뒤 배정을 실행하세요"}</div>`;
+        return;
+      }
+      panel.innerHTML = `<div style="font-weight:700;font-size:13px;margin-bottom:8px">${sel} <span style="font-weight:400;color:var(--text-3)">· 슬롯 ${ss.length}개</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto">
+        ${ss.map(s => {
+          const used = s.items.reduce((a, i) => a + i.est_min, 0);
+          return `<div class="slot ${used > s.capacity_min ? "over" : ""}">
+            <div class="slot-head"><span>${s.time}</span><span class="cap">${used}/${s.capacity_min}분
+              ${readonly ? "" : `<button class="btn ghost small" data-del-slot="${s.date}|${s.time}" title="슬롯 삭제 (안건은 미배정으로 이동)" style="padding:0 5px">✕</button>`}</span></div>
+            ${s.items.map(i => {
+              const f = fmap[i.feature_index] || { name: i.feature_index };
+              return `<div class="slot-item" data-idx="${i.feature_index}" style="cursor:pointer" title="클릭: 이동/취소/소요시간 수정">
+                ${i.followup ? "★ " : ""}<span style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">${i.feature_index}</span>
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+                ${i.predicted ? app.recBadge(i.predicted.predicted_decision) : ""}
+                <span class="est">${i.est_min}분</span></div>`;
+            }).join("") || '<div style="color:var(--text-3);font-size:11.5px;padding:4px">비어 있음</div>'}
+          </div>`;
+        }).join("")}</div>`;
+      bindDay();
+    };
 
     // 슬롯 추가/삭제
     const addBtn = el.querySelector("#s-add");
@@ -97,22 +180,27 @@ App.register("meetings", {
         await app.api("/api/schedule/slot", { version: app.state.version, op: "add", date, time,
           capacity_min: el.querySelector("#s-cap").value, base_rev: sched.rev });
         app.toast(`슬롯 추가됨: ${date} ${time}`);
+        app._meetSel = date;                       // 추가한 날짜를 달력에서 바로 보여준다
         await app.reload(); app.route();
       } catch (e) { app.toast(e.message.includes("rev") ? "다른 사용자가 먼저 수정했습니다 — 새로고침됩니다" : e.message, true); if (e.message.includes("rev")) { await app.reload(); app.route(); } }
     };
-    slotBox.querySelectorAll("[data-del-slot]").forEach(b => b.onclick = async e => {
-      e.stopPropagation();
-      const [date, time] = b.dataset.delSlot.split("|");
-      try {
-        await app.api("/api/schedule/slot", { version: app.state.version, op: "del", date, time, base_rev: sched.rev });
-        app.toast("슬롯 삭제됨 — 담긴 안건은 미배정으로 이동");
-        await app.reload(); app.route();
-      } catch (e2) { app.toast(e2.message, true); }
-    });
 
-    slotBox.querySelectorAll(".slot-item").forEach(item => item.onclick = () => {
+    // 날짜 패널의 슬롯 삭제 · 안건 조정 — 패널을 다시 그릴 때마다 연결
+    function bindDay() {
+      el.querySelectorAll("[data-del-slot]").forEach(b => b.onclick = async e => {
+        e.stopPropagation();
+        const [date, time] = b.dataset.delSlot.split("|");
+        try {
+          await app.api("/api/schedule/slot", { version: app.state.version, op: "del", date, time, base_rev: sched.rev });
+          app.toast("슬롯 삭제됨 — 담긴 안건은 미배정으로 이동");
+          await app.reload(); app.route();
+        } catch (e2) { app.toast(e2.message, true); }
+      });
+      el.querySelectorAll(".slot-item").forEach(item => item.onclick = () => openItem(item.dataset.idx));
+    }
+
+    function openItem(idx) {
       if (readonly) return;
-      const idx = item.dataset.idx;
       const cur = sched.slots.flatMap(s => s.items).find(i => i.feature_index === idx);
       const pred = cur.predicted;
       const body = App.el(`
@@ -148,7 +236,10 @@ App.register("meetings", {
         back.remove(); await app.reload(); app.route();
       };
       const back = app.modal({ title: `안건 조정 — ${idx}`, body, foot: [cancel, save] });
-    });
+    }
+
+    drawCal();
+    drawDay();
 
     // ── 회의록 ──
     const mbox = el.querySelector("#meetings-box");
