@@ -1,0 +1,18 @@
+# 운영 데이터 — 저장소로 관리하지 않는다.
+# 실데이터(미출시 Feature 정보)가 기밀이고, git pull 시 실제 업무 데이터와 충돌하기 때문.
+# 데모 데이터는 `python scripts/gen_demo_data.py`로 언제든 생성 가능.
+data/
+
+# 골든셋 업로드 원본 (실데이터 기반)
+golden/uploads/
+
+# 프롬프트 편집 이력 (로컬 백업)
+prompts/_history/
+
+# 임시/캐시
+*.tmp
+__pycache__/
+*.pyc
+
+# 로컬 실행 설정
+.claude/launch.json

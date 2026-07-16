@@ -1,0 +1,27 @@
+{
+ "_comment": "이름 기반 가벼운 식별. 실제 인증은 회사에서 어댑터로 교체. role: admin | member",
+ "users": [
+  {
+   "name": "관리자",
+   "role": "admin"
+  },
+  {
+   "name": "김기획",
+   "role": "member"
+  },
+  {
+   "name": "이유엑스",
+   "role": "member"
+  },
+  {
+   "name": "박개발",
+   "role": "member"
+  },
+  {
+   "name": "최씨엑스",
+   "role": "member"
+  }
+ ],
+ "allow_unknown": false,
+ "unknown_role": "member"
+}

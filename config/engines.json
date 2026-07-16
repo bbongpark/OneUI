@@ -1,0 +1,54 @@
+{
+ "_comment": "default_engine: mock(데모) | gemini | claude. 회사에서 gemini로 전환 후 엔진 자가진단 실행할 것.",
+ "default_engine": "mock",
+ "engines": {
+  "mock": {
+   "type": "mock",
+   "description": "데모용 가짜 엔진 — 실제 CLI 없이 그럴듯한 결과 생성"
+  },
+  "gemini": {
+   "type": "spawn",
+   "command": [
+    "gemini",
+    "-p",
+    "{prompt_file}",
+    "--output-format",
+    "json"
+   ],
+   "description": "Gemini CLI. 호출마다 프로세스 실행. 플래그는 회사에서 자가진단 후 확정.",
+   "timeout_sec": 300
+  },
+  "claude": {
+   "type": "persistent",
+   "command": [
+    "claude",
+    "-p",
+    "--input-format",
+    "stream-json",
+    "--output-format",
+    "stream-json",
+    "--max-turns",
+    "8"
+   ],
+   "description": "Claude CLI 상주 워커. 예비 엔진.",
+   "restart_every_jobs": 12,
+   "timeout_sec": 300
+  }
+ },
+ "persona_engines": {
+  "_comment": "페르소나별 엔진/모델 지정. 미지정 시 default_engine 사용.",
+  "persona-synthesis": {
+   "engine": null,
+   "model": null
+  },
+  "persona-pl": {
+   "engine": null,
+   "model": null
+  },
+  "aux-query": {
+   "engine": null,
+   "model": null
+  }
+ },
+ "batch_size": 12
+}

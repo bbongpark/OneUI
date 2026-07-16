@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One UI Agent</title>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif'>U</text></svg>">
+</head>
+<body>
+<div id="login" class="login-overlay hidden">
+  <div class="login-card">
+    <div class="login-logo">One UI <b>Agent</b></div>
+    <p class="login-sub">Feature 리뷰 파이프라인 대시보드</p>
+    <input id="login-name" type="text" placeholder="이름 또는 사번" autocomplete="off">
+    <button id="login-btn" class="btn primary wide">시작하기</button>
+    <p class="login-hint">등록된 사용자만 입장할 수 있습니다. 계정이 없으면 관리자에게 등록을 요청하세요.</p>
+  </div>
+</div>
+
+<div id="shell" class="shell hidden">
+  <aside class="sidebar">
+    <div class="brand">One UI <b>Agent</b></div>
+    <nav id="nav"></nav>
+    <div class="sidebar-foot">
+      <button id="theme-toggle" class="btn ghost small" title="테마 전환">◐ 테마</button>
+      <div class="engine-chip" id="engine-chip"></div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <select id="version-select" class="version-select" title="버전 선택"></select>
+      <div class="spacer"></div>
+      <div class="queue-pill" id="queue-pill"></div>
+      <button class="icon-btn" id="bell" title="알림">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+        <span class="bell-badge hidden" id="bell-badge"></span>
+      </button>
+      <div class="user-chip" id="user-chip"></div>
+    </header>
+    <main id="view" class="content"></main>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="/js/app.js"></script>
+<script src="/js/views/dashboard.js"></script>
+<script src="/js/views/review.js"></script>
+<script src="/js/views/meetings.js"></script>
+<script src="/js/views/tracking.js"></script>
+<script src="/js/views/insight.js"></script>
+<script src="/js/views/query.js"></script>
+<script src="/js/views/personas.js"></script>
+<script src="/js/views/settings.js"></script>
+<script src="/js/views/notifications.js"></script>
+<script src="/js/views/logs.js"></script>
+<script>App.start();</script>
+</body>
+</html>
