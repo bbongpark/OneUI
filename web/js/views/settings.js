@@ -12,11 +12,20 @@ App.register("settings", {
     const feats = (app.state.data?.features?.features) || [];
     const allCols = [...new Set(feats.slice(0, 100).flatMap(f => Object.keys(f.row || {})))];
     const noData = allCols.length === 0;
+    // 시스템이 반드시 알아야 하는 5가지 — 각각이 엑셀의 어느 열인지 지정한다
     const ROLES = {
-      feature_index: "인덱스 번호", feature_name: "Feature 이름", department: "제안 부서",
-      dev_status: "개발 상태", change_summary: "변경점"
+      feature_index: { label: "인덱스 번호", why: "Feature 식별 · PPT 슬라이드 매핑 기준" },
+      feature_name: { label: "Feature 이름", why: "목록·회의 안건에 표시" },
+      department: { label: "제안 부서", why: "회의 일정 배정 · 부서별 현황 기준" },
+      dev_status: { label: "개발 상태", why: "PL의 일정 리스크 판단 재료" },
+      change_summary: { label: "변경점", why: "PL의 템플릿 준수 검사 대상" }
     };
     const roleOf = c => Object.keys(ROLES).find(k => (schema.fields || {})[k] === c) || "";
+    // 실제 데이터에서 예시 값 — 맞는 열을 골랐는지 눈으로 확인하는 용도
+    const sampleOf = c => {
+      const v = feats.map(f => (f.row || {})[c]).find(x => String(x || "").trim());
+      return v == null ? "" : String(v).slice(0, 60);
+    };
     // 매핑 표에 보일 열 = 관리 열 (+ 논리 필드로 지정된 열은 항상 포함). 미선택이면 전체.
     const managed = schema.managed_columns || [];
     const roleCols = Object.values(schema.fields || {}).filter(Boolean);
@@ -32,49 +41,69 @@ App.register("settings", {
       ${admin ? "" : '<div class="info-banner">일반 권한은 조회만 가능합니다. 변경이 필요하면 관리자에게 요청하세요.</div>'}
 
       <div class="card" style="margin-bottom:14px"><div class="card-head">엑셀 스키마 매핑
-        <span class="sub">config/excel_schema.json — 관리 열의 역할과 용도를 지정</span></div>
+        <span class="sub">회사 엑셀의 열 구성을 시스템에 알려주는 곳 — 코드는 열 이름을 모른다</span></div>
         <div class="card-body">
           ${noData ? '<div class="warn-banner">인입된 엑셀 데이터가 없어 열 목록을 읽을 수 없습니다 — 현황판 "① 인입"으로 엑셀을 올린 뒤 여기서 매핑하세요.</div>' : `
-          <div class="filterbar" style="margin-bottom:10px">
-            ${admin ? `<button class="btn primary" id="cp-open">🗂 관리 열 선택</button>` : ""}
-            <label style="font-size:12px;color:var(--text-2)">시트 <input id="sc-sheet" value="${schema.sheet_name || ""}" style="width:130px" ${dis}></label>
-            <label style="font-size:12px;color:var(--text-2)">헤더 행 <input type="number" id="sc-hdr" value="${schema.header_row || 1}" min="1" style="width:60px" ${dis}></label>
-            <input type="search" id="sc-q" placeholder="열 이름 검색…" style="min-width:150px">
-            <span class="count">엑셀 ${allCols.length}열 중 <b style="color:var(--accent)">관리 ${cols.length}열</b>${managed.length ? "" : " (미선택 = 전체 사용)"}</span>
+          <div class="filterbar" style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+            <span style="font-size:12.5px;color:var(--text-2)">인입된 엑셀: <b>${allCols.length}열</b> 중 관리 <b style="color:var(--accent)">${cols.length}열</b>${managed.length ? "" : " (미선택 = 전체 사용)"}</span>
+            ${admin ? `<button class="btn" id="cp-open">🗂 관리 열 다시 고르기</button>` : ""}
+            <span style="flex:1"></span>
+            <label style="font-size:12px;color:var(--text-2)">시트 이름 <input id="sc-sheet" value="${schema.sheet_name || ""}" style="width:120px" ${dis}></label>
+            <label style="font-size:12px;color:var(--text-2)">헤더 행 <input type="number" id="sc-hdr" value="${schema.header_row || 1}" min="1" style="width:55px" ${dis}></label>
           </div>
-          <div class="tbl-wrap" style="max-height:46vh;overflow-y:auto">
+
+          <div style="font-weight:700;font-size:13px;margin-bottom:2px"><span class="step-num">1</span>필수 항목 연결</div>
+          <p style="font-size:12px;color:var(--text-2);margin:0 0 8px 27px">
+            시스템이 반드시 알아야 하는 5가지가 <b>엑셀의 어느 열인지</b> 골라주세요. 오른쪽 예시 값으로 맞게 골랐는지 확인할 수 있습니다.</p>
+          <table class="tbl" style="margin-bottom:18px"><thead><tr>
+            <th style="width:30%">시스템이 필요한 항목</th><th style="width:28%">엑셀의 열</th><th>이 열의 예시 값</th>
+          </tr></thead><tbody>
+            ${Object.entries(ROLES).map(([k, r]) => `<tr>
+              <td><b>${r.label}</b><div style="font-size:11px;color:var(--text-3);font-weight:400">${r.why}</div></td>
+              <td><select data-field="${k}" ${dis}><option value="">— 선택하세요 —</option>
+                ${allCols.map(c => `<option ${(schema.fields || {})[k] === c ? "selected" : ""}>${c}</option>`).join("")}</select></td>
+              <td class="idx" data-sample="${k}" style="font-family:var(--mono);font-size:11.5px"></td>
+            </tr>`).join("")}
+          </tbody></table>
+
+          <div style="font-weight:700;font-size:13px;margin-bottom:2px"><span class="step-num">2</span>열 용도 지정 <span style="font-weight:400;color:var(--text-3);font-size:12px">— 관리 열 ${cols.length}개</span></div>
+          <p style="font-size:12px;color:var(--text-2);margin:0 0 8px 27px">
+            <b>필수 기입</b>: PL 검사가 "이 열이 비어 있으면 발표 준비 미완"으로 판정합니다.<br>
+            <b>재리뷰 트리거</b>: 갱신본에서 이 열이 바뀐 Feature만 다시 리뷰합니다 (AI 비용 절감의 핵심 — 변경점처럼 판정에 영향을 주는 열만 고르세요).</p>
+          <div class="filterbar" style="margin-bottom:6px"><input type="search" id="sc-q" placeholder="열 이름 검색…" style="min-width:180px"></div>
+          <div class="tbl-wrap" style="max-height:34vh;overflow-y:auto;margin-bottom:18px">
           <table class="tbl"><thead><tr>
-            <th style="min-width:150px">관리 열</th>
-            <th style="min-width:150px">논리 필드 <span style="font-weight:400;text-transform:none;color:var(--text-3)">(5개 필수)</span></th>
-            <th>필수 기입 <input type="checkbox" id="th-req" title="전체 토글" style="width:auto;vertical-align:-2px" ${dis}><div style="font-weight:400;text-transform:none;color:var(--text-3)">PL 완결성 검사 대상</div></th>
-            <th>재리뷰 트리거 <input type="checkbox" id="th-trig" title="전체 토글" style="width:auto;vertical-align:-2px" ${dis}><div style="font-weight:400;text-transform:none;color:var(--text-3)">갱신 시 변경되면 재리뷰</div></th>
+            <th style="width:30%">관리 열</th>
+            <th style="width:14%">필수 기입 <input type="checkbox" id="th-req" title="전체 토글" style="width:auto;vertical-align:-2px" ${dis}></th>
+            <th style="width:16%">재리뷰 트리거 <input type="checkbox" id="th-trig" title="전체 토글" style="width:auto;vertical-align:-2px" ${dis}></th>
+            <th>예시 값</th>
           </tr></thead><tbody>
             ${cols.map(c => `<tr data-col-row="${c}">
-              <td style="font-weight:600">${c}</td>
-              <td><select data-role="${c}" ${dis}><option value="">—</option>
-                ${Object.entries(ROLES).map(([k, l]) => `<option value="${k}" ${roleOf(c) === k ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+              <td style="font-weight:600">${c}${roleOf(c) ? ` <span class="badge b-blue" title="필수 항목으로 연결됨">${ROLES[roleOf(c)].label}</span>` : ""}</td>
               <td style="text-align:center"><input type="checkbox" data-req="${c}" ${(schema.required_columns || []).includes(c) ? "checked" : ""} style="width:auto" ${dis}></td>
               <td style="text-align:center"><input type="checkbox" data-trig="${c}" ${(schema.review_trigger_columns || []).includes(c) ? "checked" : ""} style="width:auto" ${dis}></td>
+              <td class="idx" style="font-family:var(--mono);font-size:11.5px;color:var(--text-3);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sampleOf(c)}</td>
             </tr>`).join("")}
           </tbody></table></div>
-          <p style="font-size:11px;color:var(--text-3);margin-top:8px">관리 열만 AI 페르소나에 전달되고 리뷰 보드 상세에 표시됩니다. 목록을 바꾸려면 "관리 열 선택".</p>
-          <div class="section-label" style="display:flex;align-items:center;gap:8px">개발 완료 판정 규칙
-            <span style="font-weight:400;text-transform:none">— 현황판 "개발 완료 진행률" 집계 기준</span></div>
-          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12.5px">
+
+          <div style="font-weight:700;font-size:13px;margin-bottom:2px"><span class="step-num">3</span>개발 완료 판정 규칙</div>
+          <p style="font-size:12px;color:var(--text-2);margin:0 0 8px 27px">
+            현황판의 <b>개발 완료 진행률</b>을 무엇으로 셀지 정합니다.</p>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12.5px;margin-left:27px">
             <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
               <input type="radio" name="dv-mode" value="filled" style="width:auto" ${dis} ${(schema.dev_done_rule || {}).mode !== "values" ? "checked" : ""}>
-              <b>열에 값이 있으면 완료</b> <span style="color:var(--text-3)">(예: CL 열에 CL 번호)</span></label>
+              <b>이 열에 값이 있으면 완료</b> <span style="color:var(--text-3)">(예: CL 열에 CL 번호)</span></label>
             <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
               <input type="radio" name="dv-mode" value="values" style="width:auto" ${dis} ${(schema.dev_done_rule || {}).mode === "values" ? "checked" : ""}>
-              <b>열의 값이 특정 값이면 완료</b></label>
+              <b>이 열의 값이 특정 값이면 완료</b></label>
             <label style="display:flex;align-items:center;gap:6px">판정 열
               <select id="dv-col" ${dis}><option value="">— 선택 —</option>
                 ${allCols.map(c => `<option ${(schema.dev_done_rule || {}).column === c ? "selected" : ""}>${c}</option>`).join("")}</select></label>
             <label id="dv-pat-wrap" style="display:flex;align-items:center;gap:6px">값 형식 <span style="color:var(--text-3);font-size:11px">선택·정규식</span>
-              <input id="dv-pat" value="${(schema.dev_done_rule || {}).pattern || ""}" placeholder="예: ^\\d{6,}$" style="width:120px" ${dis}></label>
+              <input id="dv-pat" value="${(schema.dev_done_rule || {}).pattern || ""}" placeholder="예: ^\\d{6,}$" style="width:110px" ${dis}></label>
           </div>
-          <div id="dv-box" style="margin-top:8px"></div>
-          <div id="dv-preview" style="margin-top:8px;font-size:12.5px"></div>`}
+          <div id="dv-box" style="margin:8px 0 0 27px"></div>
+          <div id="dv-preview" style="margin:8px 0 0 27px;font-size:12.5px"></div>`}
         </div>
       </div>
 
@@ -182,10 +211,17 @@ App.register("settings", {
       el.querySelector("#dv-pat").oninput = preview;
       ruleUI();
 
-      // 논리 필드 중복 방지
-      el.querySelectorAll("[data-role]").forEach(s => s.onchange = () => {
-        if (s.value) el.querySelectorAll("[data-role]").forEach(o => { if (o !== s && o.value === s.value) o.value = ""; });
+      // 필수 항목 연결: 예시 값 표시 + 한 열을 두 항목에 지정하지 못하게
+      const drawSamples = () => el.querySelectorAll("[data-field]").forEach(s => {
+        const cell = el.querySelector(`[data-sample="${s.dataset.field}"]`);
+        cell.textContent = s.value ? (sampleOf(s.value) || "(값 없음)") : "";
+        cell.style.color = s.value ? "var(--text-2)" : "var(--text-3)";
       });
+      el.querySelectorAll("[data-field]").forEach(s => s.onchange = () => {
+        if (s.value) el.querySelectorAll("[data-field]").forEach(o => { if (o !== s && o.value === s.value) o.value = ""; });
+        drawSamples();
+      });
+      drawSamples();
     }
 
     if (!admin) return;
@@ -215,9 +251,9 @@ App.register("settings", {
         await app.api("/api/config/users", { ...auth, data: usersNew });
         if (!noData) {
           const fields = {};
-          el.querySelectorAll("[data-role]").forEach(s => { if (s.value) fields[s.value] = s.dataset.role; });
+          el.querySelectorAll("[data-field]").forEach(s => { if (s.value) fields[s.dataset.field] = s.value; });
           const missing = Object.keys(ROLES).filter(k => !fields[k]);
-          if (missing.length) return app.toast("논리 필드 미지정: " + missing.map(k => ROLES[k]).join(", "), true);
+          if (missing.length) return app.toast("필수 항목 미연결: " + missing.map(k => ROLES[k].label).join(", "), true);
           const picked = attr => [...el.querySelectorAll(`[${attr}]`)].filter(c => c.checked).map(c => c.getAttribute(attr));
           const schemaNew = { ...schema, sheet_name: el.querySelector("#sc-sheet").value,
             header_row: +el.querySelector("#sc-hdr").value, fields,
