@@ -23,7 +23,8 @@ python scripts/gen_demo_data.py   # 데모 데이터 재생성 (실데이터 있
 | `server.py` → `server/api.py` | HTTP API + 정적 서빙. 엔드포인트는 api.py의 do_GET/do_POST 라우팅 참조 |
 | `server/store.py` | JSON 저장소 — 쓰기 락, 낙관적 잠금(rev), 알림 발행(notify), 사용량 기록 |
 | `server/jobs.py` | 작업 큐(직렬) + 파이프라인 작업들(job_*) + 질의(run_query) |
-| `server/engines.py` | 엔진 어댑터: mock(데모) / spawn(Gemini) / persistent(Claude). 계약: run(persona, prompt, payload, attachments) → JSON |
+| `server/engines.py` | 엔진 어댑터: mock(데모) / spawn(Gemini) / persistent(Claude) / custom(→adapters/). 계약: run(persona, prompt, payload, attachments) → JSON |
+| `adapters/` | 드롭인 어댑터 — 코어 수정 없이 파일 추가만으로 PLM(`plm.py`)·CLI 엔진(`engine_*.py`) 실연결. 없으면 mock 폴백 (adapters/README.md) |
 | `web/js/app.js` | 셸: 라우터, 폴링, 공통 컴포넌트(모달·토스트·배지·슬라이드 뷰어) |
 | `web/js/views/*.js` | 화면 1개 = 파일 1개. 새 화면은 App.register("route", {title, render}) 복제 |
 | `prompts/*.md` | 페르소나 = 파일. `_common.md`이 모든 호출 앞에 주입됨 |
@@ -43,10 +44,10 @@ python scripts/gen_demo_data.py   # 데모 데이터 재생성 (실데이터 있
 
 ## 회사에서 해야 할 일 (우선순위 순)
 
-1. `config/engines.json`의 default_engine을 "gemini"로 → 현황판 "엔진 자가진단" 실행 → `server/engines.py` `_spawn`의 command 플래그를 실제 Gemini CLI 규약으로 확정
+1. `config/engines.json`의 default_engine을 "gemini"로 → 현황판 "엔진 자가진단" 실행 → `config/engines.json`의 command 플래그를 실제 Gemini CLI 규약으로 확정 (특수 연결은 `adapters/engine_<name>.py` + type "custom")
 2. 실데이터 인입: 현황판 "① 인입" 업로드(서버 내장 파서) 또는 `scripts/excel_to_json.ps1`(대량/자동화) → 설정 화면에서 스키마 매핑 확정
 3. PPT 업로드 시 PNG 렌더링이 자동 실행됨 (ppt_render 작업 → scripts/ppt_render_one.ps1, PowerPoint 필요). Office 없는 PC에서는 자동 건너뜀 — 회사 서버 PC에서 업로드하면 끝. 대량 일괄 처리는 scripts/ppt_to_png.ps1
-4. PLM 어댑터: `server/api.py`의 `api_plm_advance`(mock)를 실제 PLM API 호출로 교체
+4. PLM 연동: `adapters/plm_example.py`를 `adapters/plm.py`로 복사 후 `advance()` 채우기 (코어 수정 불필요, 없으면 mock)
 5. `prompts/persona-sw-director.md`의 "판단 성향" 섹션을 실제 회의록 기반으로 교체
 6. `templates/`에 회사 보고 PPT 템플릿 등록 + `server/jobs.py` job_report_ppt를 ppt_fill.ps1 호출로 전환
 7. 골든셋(golden/golden_set.json)에 사람 정답 20~30건 등록 → 페르소나 튜닝을 측정 기반으로

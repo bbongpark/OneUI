@@ -27,7 +27,7 @@ python server.py                  # → http://localhost:8765
 |---|---|
 | **[HANDOVER.md](HANDOVER.md)** | **회사 환경에서 이어받아 할 일** — 여기부터 읽으세요 |
 | **[CODEMAP.md](CODEMAP.md)** | **코드 구조 철저 설명** — 코드를 이어받아 개발할 때 (회사 Claude용) |
-| [MANUAL.md](MANUAL.md) | 화면 사용 설명서 (운영자·사용자) |
+| [MANUAL.md](MANUAL.md) | 화면 사용 설명서 (운영자·사용자) · PDF: [MANUAL.pdf](MANUAL.pdf) (`python scripts/md2pdf.py`로 갱신) |
 | [DESIGN.md](DESIGN.md) | 설계 기준점 — 파이프라인, 화면, 데이터 구조, 결정 배경 |
 | [CLAUDE.md](CLAUDE.md) | AI 어시스턴트용 짧은 안내 — 아키텍처, 불변 규칙, 작업 레시피 |
 | [prompts/README.md](prompts/README.md) | 페르소나 구성과 호출 규약 |
