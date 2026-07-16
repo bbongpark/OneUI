@@ -154,6 +154,20 @@ App.register("review", {
           </div>` : ""}
         ${(it.history || []).length ? `<div class="section-label">수정 이력</div>` +
           it.history.map(h => `<div style="font-size:11.5px;color:var(--text-2);padding:2px 0">· ${App.fmtDate(h.at)} <b>${h.by}</b>: ${h.field} ${h.from || "—"} → ${h.to} (${h.reason || "사유 없음"})</div>`).join("") : ""}
+        <div class="section-label">SW 담당님 예상 <span style="font-weight:400;text-transform:none">— PL 준비 완료 안건만 · 실제 회의 결정과 비교되어 적중률로 측정</span></div>
+        ${(() => {
+          const pred = predMap[idx];
+          if (pred) return `
+            <div class="pscore"><div class="ph"><span>${app.recBadge(pred.predicted_decision)}
+              <span style="font-weight:400;color:var(--text-2);font-size:11.5px">확신도 ${pred.confidence || "—"}</span></span>
+              ${pred.status === "needs_human" ? '<span class="badge b-blue">사람 확인 필요</span>' : ""}</div>
+            <div class="rat">${pred.rationale || ""}</div>
+            ${(pred.predicted_conditions || []).length ? `<div class="rat" style="color:var(--text-2)">예상 조건: ${pred.predicted_conditions.join(", ")}</div>` : ""}
+            ${(pred.anticipated_questions || []).map(q => `<div class="rat" style="color:var(--accent)">예상 질문: ${q}</div>`).join("")}</div>`;
+          if (plc.ready === false) return '<div class="empty" style="padding:14px 0">PL 미준비 — 자료가 준비되면 예상 판정 대상이 됩니다</div>';
+          if (plc.ready === true) return '<div class="empty" style="padding:14px 0">예상 판정 미실행 — 일정 배정 후 예상 판정이 실행됩니다</div>';
+          return '<div class="empty" style="padding:14px 0">PL 검사 전 — 예상 판정은 PL 준비 완료 안건만 대상입니다</div>';
+        })()}
       `);
       const foot = [];
       if (!readonly && syn.final_grade && !f.decision) {

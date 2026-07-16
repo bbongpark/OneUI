@@ -324,10 +324,12 @@ def job_predict(job):
     plc = store.load(store.dpath(v, "pl_checks.json"), {"items": {}})["items"]
     fmap = {f["feature_index"]: f for f in _features(v)["features"]}
     idxs = [i["feature_index"] for s in sched["slots"] for i in s["items"]]
+    # SW담당 예상은 PL이 '준비됨'으로 판정한 안건에 대해서만 — 자료가 없으면 임원 판단을 예측할 근거가 없다
+    ready_idxs = [i for i in idxs if i in fmap and (plc.get(i) or {}).get("ready") is True]
     feats = [{"feature_index": i, "row": _row_view(fmap[i]["row"]),
               "personas": reviews.get(i, {}).get("personas", {}),
               "synthesis": reviews.get(i, {}).get("synthesis"),
-              "pl": plc.get(i)} for i in idxs if i in fmap]
+              "pl": plc.get(i)} for i in ready_idxs]
     pred_map = {}
     for batch in _batches(feats, v):
         out = engines.run("persona-sw-director", _prompt("persona-sw-director"), {"features": batch})
@@ -336,11 +338,13 @@ def job_predict(job):
     def apply(obj):
         for s in obj["slots"]:
             for i in s["items"]:
-                if i["feature_index"] in pred_map:
-                    i["predicted"] = pred_map[i["feature_index"]]
+                # pred_map에 있으면 예측, 없으면(PL 미준비) 비움 — 재실행 시 stale 예측도 제거
+                i["predicted"] = pred_map.get(i["feature_index"])
         return obj
     store.update(store.dpath(v, "schedule.json"), apply)
-    store.notify("meeting", "예상 판정 완료 (%s) — 안건 %d건" % (v, len(pred_map)))
+    skipped = len(idxs) - len(ready_idxs)
+    store.notify("meeting", "예상 판정 완료 (%s) — 안건 %d건%s" % (
+        v, len(pred_map), (" · PL 미준비 %d건 제외" % skipped) if skipped else ""))
 
 
 def job_minutes(job):
