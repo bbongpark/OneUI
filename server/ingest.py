@@ -90,9 +90,11 @@ def ingest_excel(version, xlsx_path):
         if not os.path.exists(store.dpath(version, name)):
             store.save(store.dpath(version, name), default)
 
-    # 새 열 감지 — 스키마가 아는 열(매핑·필수·트리거·관리) 밖의 열이 오면 관리 열 선택 안내
+    # 새 열 감지 — 스키마가 아는 열(매핑·필수·트리거·관리·개발완료 판정) 밖의 열이 오면 관리 열 선택 안내
     known = set(fields.values()) | set(sc.get("required_columns", [])) | \
             set(sc.get("review_trigger_columns", [])) | set(sc.get("managed_columns", []))
+    if (sc.get("dev_done_rule") or {}).get("column"):
+        known.add(sc["dev_done_rule"]["column"])   # 관리 열이 아니어도 개발 완료 판정에 쓰는 열이다
     new_cols = [c for c in rows[0].keys() if c not in known]
 
     rereg = sum(1 for f in feats if f.get("reregistered_from"))

@@ -18,15 +18,13 @@
     "values": [],
     "pattern": ""
   },
+  "_managed_columns_comment": "리뷰 보드 상세에 보여주고 AI 입력에도 넣는 열. CL은 여기 없어도 dev_done_rule이 원본 행에서 직접 읽으므로 개발 완료 KPI는 그대로 동작한다.",
   "managed_columns": [
     "기능명",
     "AI카테고리",
     "변경점",
     "UX일정",
-    "개발일정",
-    "CL",
-    "적용모델",
-    "VOC건수"
+    "개발일정"
   ],
   "required_columns": [
     "인덱스",
