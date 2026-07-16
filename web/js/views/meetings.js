@@ -7,6 +7,7 @@ App.register("meetings", {
     const readonly = d.features.readonly;
     const admin = app.state.user.role === "admin";
     const stats = d.pred_stats.runs || [];
+    const BOARD_MAX = 5;          // 안건 배정 보드에 한 번에 표시할 회의일 수
 
     el.innerHTML = `
       <div class="page-head">
@@ -65,7 +66,7 @@ App.register("meetings", {
       </div>
 
       <div class="card" style="margin-bottom:14px"><div class="card-head">회의일 지정
-        <span class="sub">회의는 하루 한 번 — 회의의 추가·삭제는 여기서만 합니다 (달력에서 날짜 클릭)</span></div>
+        <span class="sub">회의는 하루 한 번 — <b>더블클릭</b>: 회의일 추가/삭제 · <b>클릭</b>: 아래 안건 배정에 표시/숨김 (최대 ${BOARD_MAX}일)</span></div>
         <div class="card-body">
           <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:start; gap:18px">
             <div>
@@ -95,15 +96,7 @@ App.register("meetings", {
       <div class="card" style="margin-bottom:14px"><div class="card-head">안건 배정
         <span class="sub">안건을 끌어다 다른 회의일·미배정으로 옮기세요 (회의일 자체는 위에서 관리) · 항목 클릭 = 소요시간·예상 판정 · ★=후속 보고</span>
         <span class="count" id="slot-sum" style="margin-left:auto;font-size:11.5px;color:var(--text-3)"></span></div>
-        <div class="card-body">
-          <div id="board-nav" style="display:none;align-items:center;gap:8px;margin-bottom:10px">
-            <button class="btn ghost small" id="b-prev">◀</button>
-            <span id="b-range" style="font-size:12px;color:var(--text-2);min-width:150px;text-align:center"></span>
-            <button class="btn ghost small" id="b-next">▶</button>
-            <span style="font-size:11px;color:var(--text-3)">회의일이 3일을 넘어 나눠서 표시합니다 — 드래그는 보이는 회의일끼리 가능</span>
-          </div>
-          <div class="board" id="board"></div>
-        </div>
+        <div class="card-body"><div class="board" id="board"></div></div>
       </div>
       <div class="card"><div class="card-head">회의록 <span class="sub">붙여넣기 → AI 추출 → 사람 확인 후 확정</span></div>
         <div class="card-body" id="meetings-box"></div>
@@ -122,6 +115,11 @@ App.register("meetings", {
     const today = iso(new Date());
     let calMon = new Date((dates[0] || today) + "T00:00:00");
     calMon.setDate(1);
+
+    // 보드에 표시할 회의일 — 화면 상태일 뿐 데이터가 아니다 (기본: 날짜순 앞에서 BOARD_MAX일)
+    let shownDates = (app._meetShown || []).filter(ds => byDate[ds]);
+    if (!shownDates.length) shownDates = dates.slice(0, BOARD_MAX);
+    app._meetShown = shownDates;
 
     const totalMin = slots.reduce((a, s) => a + s.items.reduce((x, i) => x + i.est_min, 0), 0);
     const totalItems = slots.reduce((a, s) => a + s.items.length, 0);
@@ -143,32 +141,58 @@ App.register("meetings", {
         const ds = iso(new Date(calMon.getFullYear(), calMon.getMonth(), dnum));
         const s = byDate[ds];
         const over = s && s.items.reduce((a, i) => a + i.est_min, 0) > s.capacity_min;
-        cells.push(`<div class="day ${s ? "has" : ""} ${ds < today ? "past" : ""}" ${readonly ? "" : `data-day="${ds}"`}
-          title="${s ? "클릭: 회의일 해제" : "클릭: 회의일로 지정"}">
-          <span class="d">${dnum}</span>
+        const on = shownDates.includes(ds);
+        cells.push(`<div class="day ${s ? "has" : ""} ${s && on ? "shown" : ""} ${ds < today ? "past" : ""}" ${readonly ? "" : `data-day="${ds}"`}
+          title="${s ? (on ? "클릭: 안건 배정에서 숨기기 · 더블클릭: 회의일 삭제" : "클릭: 안건 배정에 표시 · 더블클릭: 회의일 삭제")
+                    : "더블클릭: 회의일로 지정"}">
+          <span class="d">${dnum}${s && on ? ' <span class="eye">●</span>' : ""}</span>
           ${s ? `<span class="pill ${over ? "over" : ""}">${s.time} · ${s.items.length}건</span>` : ""}
           ${sched.dvr === ds ? '<span class="dvr">DVR</span>' : ""}
           ${(msByDate[ds] || []).map(n => `<span class="ms" title="${n}">◆ ${n}</span>`).join("")}
         </div>`);
       }
       el.querySelector("#cal").innerHTML = cells.join("");
-      el.querySelectorAll("[data-day]").forEach(c => c.onclick = () => toggleDay(c.dataset.day));
+      // 클릭 = 보드 표시/숨김, 더블클릭 = 회의일 추가/삭제.
+      // 더블클릭 시 click도 먼저 오므로, 잠깐 기다렸다가 단독 클릭일 때만 표시 토글한다.
+      let clickTimer = null;
+      el.querySelectorAll("[data-day]").forEach(c => {
+        c.onclick = () => {
+          clearTimeout(clickTimer);
+          const ds = c.dataset.day;
+          clickTimer = setTimeout(() => { if (byDate[ds]) toggleShown(ds); }, 220);
+        };
+        c.ondblclick = () => { clearTimeout(clickTimer); toggleSlot(c.dataset.day); };
+      });
     };
 
-    // 날짜 클릭 = 회의일 지정/해제
-    const toggleDay = async ds => {
+    // 클릭 — 보드에 표시/숨김 (데이터 변경 없음)
+    const toggleShown = ds => {
+      if (shownDates.includes(ds)) shownDates = shownDates.filter(x => x !== ds);
+      else {
+        if (shownDates.length >= BOARD_MAX)
+          return app.toast(`안건 배정에는 최대 ${BOARD_MAX}일까지 표시됩니다 — 하나를 숨긴 뒤 선택하세요`, true);
+        shownDates = dates.filter(x => shownDates.includes(x) || x === ds);   // 날짜순 유지
+      }
+      app._meetShown = shownDates;
+      drawCal(); drawPicked(); drawBoard();
+    };
+
+    // 더블클릭 — 회의일 추가/삭제 (실제 데이터 변경)
+    const toggleSlot = async ds => {
       const s = byDate[ds];
       try {
         if (s) {
           const n = s.items.length;
-          if (n && !confirm(`${ds} 회의일을 해제할까요? 배정된 ${n}건은 미배정으로 이동합니다.`)) return;
+          if (!confirm(`${ds} 회의일을 삭제할까요?${n ? ` 배정된 ${n}건은 미배정으로 이동합니다.` : ""}`)) return;
           await app.api("/api/schedule/slot", { version: app.state.version, op: "del", date: ds, time: s.time, base_rev: sched.rev });
-          app.toast(`회의일 해제: ${ds}`);
+          app.toast(`회의일 삭제: ${ds}`);
+          app._meetShown = shownDates.filter(x => x !== ds);
         } else {
           await app.api("/api/schedule/slot", { version: app.state.version, op: "add", date: ds,
             time: el.querySelector("#s-time").value || "14:00",
             capacity_min: el.querySelector("#s-cap").value, base_rev: sched.rev });
-          app.toast(`회의일 지정: ${ds}`);
+          app.toast(`회의일 추가: ${ds}`);
+          if (shownDates.length < BOARD_MAX) app._meetShown = [...shownDates, ds];   // 여유가 있으면 바로 표시
         }
         await app.reload(); app.route();
       } catch (e) {
@@ -177,23 +201,27 @@ App.register("meetings", {
       }
     };
 
-    // 선택된 회의일 요약 (달력 옆)
+    // 지정된 회의일 목록 (달력 옆)
     const drawPicked = () => {
       el.querySelector("#picked").innerHTML = dates.length
-        ? `<div style="font-size:12px;color:var(--text-2);margin-bottom:6px">지정된 회의일 <b>${dates.length}일</b></div>` +
+        ? `<div style="font-size:12px;color:var(--text-2);margin-bottom:6px">지정된 회의일 <b>${dates.length}일</b>
+             <span style="color:var(--text-3)">· 안건 배정에 표시 중 ${shownDates.length}/${BOARD_MAX}일</span></div>` +
           dates.map(ds => {
             const s = byDate[ds], used = s.items.reduce((a, i) => a + i.est_min, 0);
             const dw = DOW[new Date(ds + "T00:00:00").getDay()];
-            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:12.5px">
+            const on = shownDates.includes(ds);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:12.5px;${on ? "" : "opacity:.55"}">
+              <input type="checkbox" data-show="${ds}" ${on ? "checked" : ""} style="width:auto" title="안건 배정에 표시">
               <b style="font-family:var(--mono)">${ds}</b><span style="color:var(--text-3)">(${dw})</span>
               ${readonly ? `<span>${s.time}</span>`
                 : `<input type="time" data-t="${ds}" value="${s.time}" step="600" style="width:100px;padding:3px 6px">`}
               <span style="margin-left:auto;color:${used > s.capacity_min ? "var(--crit)" : "var(--text-2)"}">${used}/${s.capacity_min}분 · ${s.items.length}건</span>
-              ${readonly ? "" : `<button class="btn ghost small" data-rm="${ds}" title="회의일 해제" style="padding:0 5px">✕</button>`}
+              ${readonly ? "" : `<button class="btn ghost small" data-rm="${ds}" title="회의일 삭제 (안건은 미배정으로)" style="padding:0 5px">✕</button>`}
             </div>`;
           }).join("")
-        : '<div class="empty" style="padding:24px 0">달력에서 회의할 날짜를 클릭하세요 (보통 3일 정도)</div>';
-      el.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => toggleDay(b.dataset.rm));
+        : '<div class="empty" style="padding:24px 0">달력에서 날짜를 <b>더블클릭</b>해 회의일을 추가하세요</div>';
+      el.querySelectorAll("[data-show]").forEach(c => c.onclick = e => { e.preventDefault(); toggleShown(c.dataset.show); });
+      el.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => toggleSlot(b.dataset.rm));
       el.querySelectorAll("[data-t]").forEach(inp => inp.onchange = async () => {
         const ds = inp.dataset.t, old = byDate[ds].time;
         try {   // 시각 변경 = 같은 날 슬롯을 새 시각으로 다시 만든다 (안건 유지)
@@ -204,15 +232,11 @@ App.register("meetings", {
       });
     };
 
-    // ── 보드: 회의일(최대 3일)을 나란히 놓고 안건을 드래그로 옮긴다 ──
-    // 회의일 추가·삭제는 위 "회의일 지정"에서만 — 여기선 안건만 옮긴다(실수로 회의가 삭제되지 않게).
-    const PAGE = 3;
-    const pages = Math.max(Math.ceil(dates.length / PAGE), 1);
-    let page = Math.min(app._meetPage || 0, pages - 1);
-
+    // ── 보드: 표시 중인 회의일(최대 BOARD_MAX)을 나란히 놓고 안건을 드래그로 옮긴다 ──
+    // 회의일 추가·삭제는 위 "회의일 지정"에서만 — 여기 ✕는 보드에서 숨기기일 뿐이다.
     const drawBoard = () => {
       const un = sched.unassigned || [];
-      const shown = dates.slice(page * PAGE, page * PAGE + PAGE);
+      const shown = dates.filter(ds => shownDates.includes(ds));
       const card = (i, fi) => {
         const f = fmap[fi] || { name: fi };
         const est = i ? i.est_min : 5;
@@ -227,7 +251,8 @@ App.register("meetings", {
         const pct = Math.min(Math.round(used / s.capacity_min * 100), 100);
         const dw = DOW[new Date(ds + "T00:00:00").getDay()];
         return `<div class="bcol ${used > s.capacity_min ? "over-cap" : ""}" data-drop="${ds}">
-          <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span></div>
+          <div class="bhead"><span class="dt">${ds.slice(5)}</span><span class="dow">(${dw}) ${s.time}</span>
+            <button class="btn ghost small x" data-hide="${ds}" title="안건 배정에서 숨기기 (회의일은 유지됩니다)" style="padding:0 4px">✕</button></div>
           <div class="cap"><span>${s.items.length}건</span><span style="${used > s.capacity_min ? "color:var(--crit);font-weight:700" : ""}">${used}/${s.capacity_min}분</span></div>
           <div class="meter ${used > s.capacity_min ? "over" : pct > 85 ? "warn" : ""}"><i style="width:${pct}%"></i></div>
           ${s.items.map(i => card(i, i.feature_index)).join("") || '<div class="empty-drop">여기로 안건을 끌어오세요</div>'}
@@ -239,22 +264,14 @@ App.register("meetings", {
           <div class="cap"><span style="color:var(--text-3);font-size:10.5px">회의일에서 빼면 여기로</span></div>
           ${un.map(fi => card(null, fi)).join("") || '<div class="empty-drop">없음</div>'}
         </div>` +
-        (dates.length ? "" : '<div class="empty" style="flex:1">위 "회의일 지정"에서 날짜를 클릭하면 여기에 나타납니다</div>');
-      // 회의일이 3일을 넘을 때만 페이지 이동
-      const nav = el.querySelector("#board-nav");
-      nav.style.display = pages > 1 ? "flex" : "none";
-      if (pages > 1) {
-        el.querySelector("#b-range").textContent = `${shown[0]?.slice(5)} ~ ${shown[shown.length - 1]?.slice(5)} (${page + 1}/${pages})`;
-        el.querySelector("#b-prev").disabled = page === 0;
-        el.querySelector("#b-next").disabled = page >= pages - 1;
-      }
+        (shown.length ? "" : `<div class="empty" style="flex:1">${dates.length
+          ? "표시할 회의일을 위 달력에서 클릭하세요"
+          : '위 달력에서 날짜를 <b>더블클릭</b>해 회의일을 추가하세요'}</div>`);
       bindBoard();
     };
 
-    el.querySelector("#b-prev").onclick = () => { page = Math.max(page - 1, 0); app._meetPage = page; drawBoard(); };
-    el.querySelector("#b-next").onclick = () => { page = Math.min(page + 1, pages - 1); app._meetPage = page; drawBoard(); };
-
     const bindBoard = () => {
+      el.querySelectorAll("[data-hide]").forEach(b => b.onclick = e => { e.stopPropagation(); toggleShown(b.dataset.hide); });
       el.querySelectorAll(".bitem").forEach(it => {
         it.onclick = () => openItem(it.dataset.idx);
         it.ondragstart = e => {

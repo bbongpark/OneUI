@@ -285,10 +285,13 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .cal .day.pad { border-color: transparent; background: transparent; }
 .cal .day:not(.pad) { cursor: pointer; }
 .cal .day:not(.pad):hover { border-color: var(--border-strong); transform: translateY(-1px); }
-.cal .day.has { border-color: var(--accent); border-width: 2px; background: var(--accent-bg); }
+.cal .day.has { border-color: var(--accent); background: var(--accent-bg); }
 .cal .day.has:hover { box-shadow: var(--shadow); }
+.cal .day.shown { border-width: 2px; }          /* 안건 배정에 표시 중 */
+.cal .day.has:not(.shown) { opacity: .7; }
 .cal .day .d { font-weight: 700; color: var(--text-2); }
 .cal .day.has .d { color: var(--accent); }
+.cal .day .eye { font-size: 8px; vertical-align: 2px; }
 .cal .day.past { opacity: .5; }
 .cal .day .pill { font-size: 10px; padding: 1px 5px; border-radius: 5px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal .day.has .pill { background: var(--surface); color: var(--accent); font-weight: 600; }
